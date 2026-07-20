@@ -1,66 +1,49 @@
 # Social Network API
 
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green)
-![GraphQL](https://img.shields.io/badge/GraphQL-16.8-pink)
-![Apollo](https://img.shields.io/badge/Apollo-3.13-blue)
-![MongoDB](https://img.shields.io/badge/MongoDB-6.0-green)
-![Redis](https://img.shields.io/badge/Redis-7.x-red)
+A social media API built with GraphQL, Apollo Server, and MongoDB featuring real-time subscriptions, feed algorithms, and optimized data loading.
 
-A production-ready social media API built with GraphQL, Apollo Server, and MongoDB featuring real-time subscriptions, feed algorithms, and optimized data loading.
+## Overview
 
-## 📋 Overview
+This GraphQL-based backend for social media applications is built with Apollo Server, MongoDB, and Redis. It implements feed algorithms, real-time subscriptions, DataLoader for query optimization, and analytics.
 
-The Social Network API is a comprehensive GraphQL-based backend for social media applications. Built with Apollo Server, MongoDB, and Redis, this API implements advanced features including feed algorithms, real-time subscriptions, DataLoader for N+1 query optimization, and comprehensive analytics.
+## Features
 
-## ✨ Features
+- Post management with media support
+- User profiles with avatars and bios
+- Follow system with bidirectional relationships
+- Smart feed algorithm (chronological + engagement-based)
+- Nested comments and emoji reactions
+- Hashtag tracking and user mentions
+- Real-time GraphQL subscriptions
+- DataLoader for N+1 query optimization
+- Redis caching for performance
+- Media upload with GraphQL multipart
+- Content moderation
+- User engagement analytics
+- GraphQL query complexity analysis
+- Rate limiting
+- Cursor-based pagination
+- Prometheus metrics
+- JWT authentication
+- Field-level authorization
+- Input validation and sanitization
+- Helmet.js security headers
 
-### Core Social Features
-- **Post Management**: Create, read, update, and delete posts with media support
-- **User Profiles**: Comprehensive user profiles with avatars and bios
-- **Follow System**: Follow/unfollow users with bidirectional relationships
-- **Feed Algorithm**: Smart feed combining chronological and engagement-based ranking
-- **Comments & Reactions**: Nested comments and emoji reactions on posts
-- **Hashtags & Mentions**: Hashtag tracking and user mentions in posts
+## Tech Stack
 
-### Advanced Features
-- **Real-time Subscriptions**: GraphQL subscriptions for live updates
-- **DataLoader**: Optimized batch loading to prevent N+1 queries
-- **Redis Caching**: Feed and profile caching for performance
-- **Media Upload**: Image and video upload with GraphQL multipart
-- **Content Moderation**: Automated content filtering and moderation
-- **Analytics**: User engagement metrics and post analytics
+- Node.js 18.x
+- GraphQL 16.8.x
+- Apollo Server 3.13.x
+- Express.js 4.18.x
+- MongoDB 6.0+
+- Mongoose 8.0.x
+- Redis 7.x
+- DataLoader 2.2.x
+- JWT 9.0.x
+- Winston 3.11.x
+- Prometheus 15.1.x
 
-### Performance & Scalability
-- **Query Optimization**: DataLoader for efficient data fetching
-- **Caching Strategy**: Redis caching for frequently accessed data
-- **Rate Limiting**: GraphQL query complexity analysis and rate limiting
-- **Pagination**: Cursor-based pagination for large datasets
-- **Metrics**: Prometheus metrics for monitoring
-
-### Security
-- **Authentication**: JWT-based authentication for GraphQL context
-- **Authorization**: Field-level authorization for sensitive data
-- **Input Validation**: Comprehensive input validation and sanitization
-- **Rate Limiting**: Per-user rate limiting to prevent abuse
-- **Content Security**: Helmet.js security headers
-
-## 🛠️ Tech Stack
-
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Node.js | 18.x | Runtime environment |
-| GraphQL | 16.8.x | Query language |
-| Apollo Server | 3.13.x | GraphQL server |
-| Express.js | 4.18.x | Web framework |
-| MongoDB | 6.0+ | Database |
-| Mongoose | 8.0.x | ODM |
-| Redis | 7.x | Caching layer |
-| DataLoader | 2.2.x | Batch loading |
-| JWT | 9.0.x | Authentication |
-| Winston | 3.11.x | Logging |
-| Prometheus | 15.1.x | Metrics |
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 social-network-api/
@@ -106,7 +89,7 @@ social-network-api/
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -281,7 +264,7 @@ subscription Notifications {
 
 ---
 
-## 🔐 Security Features
+## Security Features
 
 ### Authentication
 - **JWT Context**: Authentication token passed in GraphQL context)
@@ -300,7 +283,7 @@ subscription Notifications {
 
 ---
 
-## 📊 Database Schema
+## Database Schema
 
 ### User Model
 ```javascript
@@ -358,7 +341,7 @@ subscription Notifications {
 
 ---
 
-## 🧪 Testing
+## Testing
 
 The project includes comprehensive test suites:
 
@@ -398,7 +381,7 @@ curl http://localhost:4000/metrics
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 ### Environment Variables for Production
 
@@ -424,7 +407,7 @@ ENABLE_METRICS=true
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -436,13 +419,13 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📝 License
+## License
 
 Proprietary - All rights reserved.
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Alakhdeep Singh**
 
