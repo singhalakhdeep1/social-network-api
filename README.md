@@ -5,7 +5,6 @@
 ![Apollo](https://img.shields.io/badge/Apollo-3.13-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-6.0-green)
 ![Redis](https://img.shields.io/badge/Redis-7.x-red)
-![License](https://img.shields.io/badge/License-MIT-blue)
 
 A production-ready social media API built with GraphQL, Apollo Server, and MongoDB featuring real-time subscriptions, feed algorithms, and optimized data loading.
 
