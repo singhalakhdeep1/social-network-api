@@ -4,34 +4,44 @@ A social media API built with GraphQL, Apollo Server, and MongoDB featuring real
 
 ## Overview
 
-This GraphQL-based backend for social media applications is built with Apollo Server, MongoDB, and Redis. It implements feed algorithms, real-time subscriptions, DataLoader for query optimization, and analytics.
+A full-stack social media application with GraphQL API and Next.js frontend. The backend is built with Apollo Server, MongoDB, and Redis, featuring feed algorithms, real-time subscriptions, DataLoader for query optimization, and comprehensive analytics. The entire codebase has been converted to TypeScript for type safety and better developer experience.
 
 ## Features
 
-- Post management with media support
-- User profiles with avatars and bios
-- Follow system with bidirectional relationships
-- Smart feed algorithm (chronological + engagement-based)
-- Nested comments and emoji reactions
-- Hashtag tracking and user mentions
-- Real-time GraphQL subscriptions
-- DataLoader for N+1 query optimization
-- Redis caching for performance
-- Media upload with GraphQL multipart
-- Content moderation
-- User engagement analytics
-- GraphQL query complexity analysis
-- Rate limiting
-- Cursor-based pagination
-- Prometheus metrics
-- JWT authentication
-- Field-level authorization
-- Input validation and sanitization
-- Helmet.js security headers
+### Core Features
+- **Post Management**: Create, update, delete, pin, archive posts with media support
+- **User Profiles**: Avatars, bios, follower/following counts, profile pages
+- **Follow System**: Bidirectional follow relationships with notifications
+- **Smart Feed Algorithm**: Personalized feed combining recency and engagement scoring
+- **Nested Comments**: Threaded comment system with replies
+- **Emoji Reactions**: Multiple emoji reactions on posts and comments
+- **Hashtag Tracking**: Automatic hashtag extraction and trending hashtags
+- **User Mentions**: @username parsing with mention notifications
+- **Real-time Subscriptions**: Live updates for posts, likes, comments, reactions
+- **Notifications**: Comprehensive notification system with read/unread status
+- **Analytics Dashboard**: User engagement metrics and analytics
+
+### Technical Features
+- **TypeScript**: Full TypeScript conversion for type safety
+- **DataLoader**: N+1 query optimization with batch loading
+- **Redis Caching**: Performance optimization for feeds and posts
+- **GraphQL Multipart Upload**: Media upload handling
+- **Content Moderation**: Automated content filtering
+- **Input Validation**: Sanitization and validation using validator and xss
+- **Query Complexity Analysis**: Depth limiting for GraphQL queries
+- **Rate Limiting**: Per-IP rate limiting on API endpoints
+- **Cursor-based Pagination**: Efficient pagination for large datasets
+- **Prometheus Metrics**: HTTP request and operation metrics
+- **JWT Authentication**: Secure token-based authentication
+- **Field-level Authorization**: Granular permission checks
+- **Helmet.js**: Security headers for Express
+- **Winston Logging**: Structured logging with file and console transports
 
 ## Tech Stack
 
+### Backend
 - Node.js 18.x
+- TypeScript 5.3.x
 - GraphQL 16.8.x
 - Apollo Server 3.13.x
 - Express.js 4.18.x
@@ -42,49 +52,62 @@ This GraphQL-based backend for social media applications is built with Apollo Se
 - JWT 9.0.x
 - Winston 3.11.x
 - Prometheus 15.1.x
+- graphql-upload 16.0.x
+- graphql-depth-limit 1.1.0
+- validator 13.11.x
+- xss 1.0.14
+
+### Frontend
+- Next.js 14.x
+- TypeScript 5.3.x
+- React 18.x
+- Apollo Client 3.8.x
+- graphql-ws 5.14.x
+- TailwindCSS 3.4.x
+- Lucide React 0.303.x
+- date-fns 3.0.x
 
 ## Project Structure
 
 ```
 social-network-api/
-├── config/
-│   └── redis.js              # Redis configuration
-├── dataloaders/
-│   ├── userLoader.js         # User batch loading
-│   ├── postLoader.js         # Post batch loading
-│   └── commentLoader.js      # Comment batch loading
-├── graphql/
-│   ├── schema.js             # GraphQL schema definition
-│   ├── resolvers/
-│   │   ├── index.js          # Resolver aggregation
-│   │   ├── userResolvers.js  # User queries/mutations
-│   │   ├── postResolvers.js  # Post queries/mutations
-│   │   ├── commentResolvers.js # Comment resolvers
-│   │   └── subscriptionResolvers.js # Real-time subscriptions
-│   └── types/
-│       ├── user.js           # User type definitions
-│       ├── post.js           # Post type definitions
-│       └── comment.js        # Comment type definitions
-├── middleware/
-│   └── auth.js               # JWT authentication
-├── models/
-│   ├── User.js               # User schema
-│   ├── Post.js               # Post schema
-│   ├── Comment.js            # Comment schema
-│   ├── Like.js               # Like/reaction schema
-│   └── Follow.js             # Follow relationship schema
-├── tests/
-│ ├── resolvers.test.js       # Resolver tests
-│ └── schema.test.js          # Schema validation tests
-├── utils/
-│   └── logger.js             # Winston logger
-├── frontend-test/            # React test frontend
+├── src/                      # TypeScript source files
+│   ├── config/
+│   │   └── redis.ts          # Redis configuration
+│   ├── dataloaders/
+│   │   └── index.ts          # DataLoader for N+1 optimization
+│   ├── graphql/
+│   │   ├── schema.ts         # GraphQL schema definition
+│   │   └── resolvers/
+│   │       └── index.ts      # All resolvers (queries, mutations, subscriptions)
+│   ├── middleware/
+│   │   ├── auth.ts           # JWT authentication
+│   │   └── validation.ts     # Input validation & sanitization
+│   ├── models/
+│   │   ├── User.ts           # User schema with auth methods
+│   │   ├── Post.ts           # Post schema with media, hashtags, mentions
+│   │   ├── Comment.ts        # Comment schema with nested replies
+│   │   ├── Notification.ts   # Notification schema
+│   │   ├── AnalyticsEvent.ts # Analytics tracking schema
+│   │   └── Reaction.ts       # Emoji reactions schema
+│   ├── utils/
+│   │   └── logger.ts         # Winston logger
+│   └── server.ts             # Entry point with Apollo Server
+├── frontend-test/            # Next.js TypeScript frontend
+│   ├── app/
+│   │   ├── layout.tsx        # Root layout with Apollo Provider
+│   │   └── page.tsx          # Main page with all features
+│   ├── lib/
+│   │   ├── apollo-client.ts  # Apollo Client setup
+│   │   └── graphql-queries.ts # GraphQL queries & mutations
+│   └── package.json
+├── tests/                    # Test files
+├── dist/                     # Compiled JavaScript (generated)
 ├── .env.example              # Environment template
 ├── .gitignore
-├── jest.config.js            # Jest configuration
-├── jest.setup.js             # Jest setup
-├── package.json
-└── server.js                 # Entry point
+├── package.json              # Backend dependencies
+├── tsconfig.json             # TypeScript configuration
+└── README.md
 ```
 
 ---
@@ -106,12 +129,19 @@ git clone https://github.com/Alakhdeepsingh/social-network-api.git
 cd social-network-api
 ```
 
-2. Install dependencies:
+2. Install backend dependencies:
 ```bash
 npm install
 ```
 
-3. Configure environment variables:
+3. Install frontend dependencies:
+```bash
+cd frontend-test
+npm install
+cd ..
+```
+
+4. Configure environment variables:
 ```bash
 cp .env.example .env
 ```
@@ -129,12 +159,25 @@ MAX_FILE_SIZE=10485760
 RATE_LIMIT_PER_MINUTE=60
 ```
 
-4. Start the development server:
+5. Build TypeScript (for production):
+```bash
+npm run build
+```
+
+6. Start the development server:
 ```bash
 npm run dev
 ```
 
-The GraphQL Playground will be available at `http://localhost:4000/graphql`
+The GraphQL API will be available at `http://localhost:4000/graphql`
+
+7. Start the frontend (in a separate terminal):
+```bash
+cd frontend-test
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3100`
 
 ---
 
