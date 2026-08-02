@@ -1,0 +1,194 @@
+// gRPC service definition for social-network-api
+
+syntax = "proto3";
+
+package socialnetwork;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc CreateUser(CreateUserRequest) returns (User);
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+  rpc ListUsers(ListUsersRequest) returns (UserList);
+}
+
+service PostService {
+  rpc GetPost(GetPostRequest) returns (Post);
+  rpc CreatePost(CreatePostRequest) returns (Post);
+  rpc UpdatePost(UpdatePostRequest) returns (Post);
+  rpc DeletePost(DeletePostRequest) returns (DeleteResponse);
+  rpc GetFeed(GetFeedRequest) returns (PostList);
+}
+
+service FollowService {
+  rpc Follow(FollowRequest) returns (FollowResponse);
+  rpc Unfollow(FollowRequest) returns (FollowResponse);
+  rpc GetFollowers(GetFollowersRequest) returns (UserList);
+  rpc GetFollowing(GetFollowingRequest) returns (UserList);
+}
+
+service LikeService {
+  rpc Like(LikeRequest) returns (LikeResponse);
+  rpc Unlike(LikeRequest) returns (LikeResponse);
+  rpc GetLikes(GetLikesRequest) returns (UserList);
+}
+
+service CommentService {
+  rpc CreateComment(CreateCommentRequest) returns (Comment);
+  rpc GetComments(GetCommentsRequest) returns (CommentList);
+}
+
+service GraphService {
+  rpc GetShortestPath(PathRequest) returns (PathResponse);
+  rpc GetMutualFriends(MutualFriendsRequest) returns (UserList);
+  rpc GetRecommendations(RecommendationRequest) returns (UserList);
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string display_name = 4;
+  string bio = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+}
+
+message Post {
+  string id = 1;
+  string author_id = 2;
+  string content = 3;
+  repeated string images = 4;
+  int64 created_at = 5;
+  int64 updated_at = 6;
+}
+
+message Comment {
+  string id = 1;
+  string post_id = 2;
+  string author_id = 3;
+  string content = 4;
+  int64 created_at = 5;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string display_name = 3;
+  string bio = 4;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  string display_name = 2;
+  string bio = 3;
+}
+
+message ListUsersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message UserList {
+  repeated User users = 1;
+  int32 total = 2;
+}
+
+message GetPostRequest {
+  string id = 1;
+}
+
+message CreatePostRequest {
+  string author_id = 1;
+  string content = 2;
+  repeated string images = 3;
+}
+
+message UpdatePostRequest {
+  string id = 1;
+  string content = 2;
+}
+
+message DeletePostRequest {
+  string id = 1;
+}
+
+message DeleteResponse {
+  bool success = 1;
+}
+
+message PostList {
+  repeated Post posts = 1;
+  int32 total = 2;
+}
+
+message GetFeedRequest {
+  string user_id = 1;
+  int32 limit = 2;
+}
+
+message FollowRequest {
+  string follower_id = 1;
+  string following_id = 2;
+}
+
+message FollowResponse {
+  bool success = 1;
+}
+
+message GetFollowersRequest {
+  string user_id = 1;
+}
+
+message GetFollowingRequest {
+  string user_id = 1;
+}
+
+message LikeRequest {
+  string user_id = 1;
+  string post_id = 2;
+}
+
+message LikeResponse {
+  bool success = 1;
+}
+
+message GetLikesRequest {
+  string post_id = 1;
+}
+
+message CreateCommentRequest {
+  string post_id = 1;
+  string author_id = 2;
+  string content = 3;
+}
+
+message GetCommentsRequest {
+  string post_id = 1;
+}
+
+message CommentList {
+  repeated Comment comments = 1;
+}
+
+message PathRequest {
+  string from_user_id = 1;
+  string to_user_id = 2;
+}
+
+message PathResponse {
+  repeated string user_ids = 1;
+  int32 distance = 2;
+}
+
+message MutualFriendsRequest {
+  string user_id_1 = 1;
+  string user_id_2 = 2;
+}
+
+message RecommendationRequest {
+  string user_id = 1;
+}
