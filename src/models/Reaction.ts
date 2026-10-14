@@ -1,45 +1,32 @@
 /**
- * REACTION MODEL (Emoji Reactions)
+ * Emoji reaction on a post, or on a comment (then `comment` is set, `post` is its post).
+ * One reaction per user per target; reacting again replaces the emoji.
  */
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 
-import mongoose, { Document, Model, Schema } from 'mongoose';
+export const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🔥', '👏', '🙏'];
 
 export interface IReaction extends Document {
-  user: mongoose.Types.ObjectId;
-  post: mongoose.Types.ObjectId;
-  comment?: mongoose.Types.ObjectId;
+  user: Types.ObjectId;
+  post: Types.ObjectId;
+  comment: Types.ObjectId | null;
   emoji: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
-const reactionSchema: Schema<IReaction> = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+const reactionSchema = new Schema<IReaction>(
+  {
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    post: { type: Schema.Types.ObjectId, ref: 'Post', required: true },
+    comment: { type: Schema.Types.ObjectId, ref: 'Comment', default: null },
+    emoji: { type: String, required: true, enum: REACTION_EMOJIS }
   },
-  post: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post',
-    required: true
-  },
-  comment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Comment'
-  },
-  emoji: {
-    type: String,
-    required: true,
-    enum: ['👍', '❤️', '😂', '😮', '😢', '😡', '🎉', '🔥', '👏', '🙏']
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
-reactionSchema.index({ user: 1, post: 1 }, { unique: true });
-reactionSchema.index({ user: 1, comment: 1 }, { unique: true });
-reactionSchema.index({ post: 1, emoji: 1 });
+reactionSchema.index({ user: 1, post: 1, comment: 1 }, { unique: true });
+reactionSchema.index({ post: 1, comment: 1, emoji: 1 });
 
-const Reaction: Model<IReaction> = mongoose.model<IReaction>('Reaction', reactionSchema);
-
+const Reaction: Model<IReaction> = mongoose.models.Reaction || mongoose.model<IReaction>('Reaction', reactionSchema);
 export default Reaction;

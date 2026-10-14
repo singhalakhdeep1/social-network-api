@@ -1,105 +1,54 @@
 /**
- * CONVERSATION MODEL
- * 
- * For Direct Messaging System
+ * Direct or group conversation. Archive/mute are per participant; unread counters are a map
+ * keyed by user id. Direct conversations are de-duplicated through `participantsKey`.
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 
 export interface IConversation extends Document {
-  participants: mongoose.Types.ObjectId[];
+  participants: Types.ObjectId[];
+  participantsKey?: string;
   isGroup: boolean;
   groupName?: string;
   groupAvatar?: string;
   groupDescription?: string;
-  createdBy: mongoose.Types.ObjectId;
-  admins: mongoose.Types.ObjectId[];
-  lastMessage?: mongoose.Types.ObjectId;
+  encrypted: boolean;
+  createdBy: Types.ObjectId;
+  admins: Types.ObjectId[];
+  lastMessage?: Types.ObjectId;
   lastMessageAt?: Date;
-  typingUsers: mongoose.Types.ObjectId[];
-  isArchived: boolean;
-  archivedBy?: mongoose.Types.ObjectId[];
-  isMuted: boolean;
-  mutedBy?: { userId: mongoose.Types.ObjectId; until: Date }[];
+  typingUsers: Types.ObjectId[];
+  archivedBy: Types.ObjectId[];
+  mutedBy: { user: Types.ObjectId; until?: Date }[];
   unreadCount: Map<string, number>;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const conversationSchema: Schema<IConversation> = new mongoose.Schema({
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }],
-  isGroup: {
-    type: Boolean,
-    default: false
+const conversationSchema = new Schema<IConversation>(
+  {
+    participants: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
+    participantsKey: { type: String },
+    isGroup: { type: Boolean, default: false },
+    groupName: { type: String, maxlength: 100 },
+    groupAvatar: String,
+    groupDescription: { type: String, maxlength: 500 },
+    encrypted: { type: Boolean, default: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    admins: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    lastMessage: { type: Schema.Types.ObjectId, ref: 'Message' },
+    lastMessageAt: Date,
+    typingUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    archivedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    mutedBy: [
+      new Schema({ user: { type: Schema.Types.ObjectId, ref: 'User', required: true }, until: Date }, { _id: false })
+    ],
+    unreadCount: { type: Map, of: Number, default: () => new Map() }
   },
-  groupName: {
-    type: String
-  },
-  groupAvatar: {
-    type: String
-  },
-  groupDescription: {
-    type: String,
-    maxlength: 500
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  admins: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  lastMessage: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message'
-  },
-  lastMessageAt: {
-    type: Date
-  },
-  typingUsers: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  isArchived: {
-    type: Boolean,
-    default: false
-  },
-  archivedBy: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  isMuted: {
-    type: Boolean,
-    default: false
-  },
-  mutedBy: [{
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    until: {
-      type: Date
-    }
-  }],
-  unreadCount: {
-    type: Map,
-    of: Number,
-    default: new Map()
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
-conversationSchema.index({ participants: 1 });
-conversationSchema.index({ lastMessageAt: -1 });
-conversationSchema.index({ isGroup: 1 });
+conversationSchema.index({ participants: 1, lastMessageAt: -1 });
+conversationSchema.index({ participantsKey: 1 }, { unique: true, partialFilterExpression: { participantsKey: { $type: 'string' } } });
 
-const Conversation: Model<IConversation> = mongoose.model<IConversation>('Conversation', conversationSchema);
-
+const Conversation: Model<IConversation> = mongoose.models.Conversation || mongoose.model<IConversation>('Conversation', conversationSchema);
 export default Conversation;

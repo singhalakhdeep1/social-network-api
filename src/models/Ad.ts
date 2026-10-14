@@ -1,16 +1,14 @@
 /**
- * AD MODEL
- * 
- * For Monetization
+ * Advertiser campaign. `budget` is prepaid; `spent` grows with impressions and clicks.
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
+import { IMedia, mediaSchema } from './Post';
 
 export interface IAd extends Document {
-  advertiser: mongoose.Types.ObjectId;
+  advertiser: Types.ObjectId;
   title: string;
   description: string;
-  media: { url: string; type: string }[];
+  media: IMedia[];
   targetUrl: string;
   targetAudience: {
     interests: string[];
@@ -21,86 +19,43 @@ export interface IAd extends Document {
   spent: number;
   impressions: number;
   clicks: number;
-  ctr: number;
   status: 'draft' | 'active' | 'paused' | 'completed';
+  paymentId?: string;
+  paymentMode: 'stripe' | 'demo';
   startDate: Date;
   endDate: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const adSchema: Schema<IAd> = new mongoose.Schema({
-  advertiser: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  title: {
-    type: String,
-    required: true,
-    maxlength: 100
-  },
-  description: {
-    type: String,
-    required: true,
-    maxlength: 500
-  },
-  media: [{
-    url: { type: String, required: true },
-    type: { type: String, required: true }
-  }],
-  targetUrl: {
-    type: String,
-    required: true
-  },
-  targetAudience: {
-    interests: [{ type: String }],
-    ageRange: {
-      min: Number,
-      max: Number
+const adSchema = new Schema<IAd>(
+  {
+    advertiser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    title: { type: String, required: true, maxlength: 100 },
+    description: { type: String, required: true, maxlength: 500 },
+    media: { type: [mediaSchema], default: [] },
+    targetUrl: { type: String, required: true },
+    targetAudience: {
+      interests: [{ type: String, lowercase: true, trim: true }],
+      ageRange: { min: Number, max: Number },
+      locations: [{ type: String, lowercase: true, trim: true }]
     },
-    locations: [{ type: String }]
+    budget: { type: Number, required: true, min: 1 },
+    spent: { type: Number, default: 0 },
+    impressions: { type: Number, default: 0 },
+    clicks: { type: Number, default: 0 },
+    status: { type: String, enum: ['draft', 'active', 'paused', 'completed'], default: 'draft' },
+    paymentId: String,
+    paymentMode: { type: String, enum: ['stripe', 'demo'], default: 'demo' },
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true }
   },
-  budget: {
-    type: Number,
-    required: true
-  },
-  spent: {
-    type: Number,
-    default: 0
-  },
-  impressions: {
-    type: Number,
-    default: 0
-  },
-  clicks: {
-    type: Number,
-    default: 0
-  },
-  ctr: {
-    type: Number,
-    default: 0
-  },
-  status: {
-    type: String,
-    enum: ['draft', 'active', 'paused', 'completed'],
-    default: 'draft'
-  },
-  startDate: {
-    type: Date,
-    required: true
-  },
-  endDate: {
-    type: Date,
-    required: true
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
 adSchema.index({ advertiser: 1, status: 1 });
-adSchema.index({ status: 1, startDate: 1 });
+adSchema.index({ status: 1, startDate: 1, endDate: 1 });
+adSchema.index({ paymentId: 1 }, { sparse: true });
 
-const Ad: Model<IAd> = mongoose.model<IAd>('Ad', adSchema);
-
+const Ad: Model<IAd> = mongoose.models.Ad || mongoose.model<IAd>('Ad', adSchema);
 export default Ad;

@@ -1,64 +1,42 @@
-// GraphQL Subscriptions for social-network-api
+/**
+ * GraphQL subscriptions over WebSocket (graphql-ws protocol, `ws` transport).
+ * Clients authenticate in the `connection_init` payload: { authToken: "<access token>" }.
+ */
+import { Server as HttpServer } from 'http';
+import { WebSocketServer } from 'ws';
+import { useServer } from 'graphql-ws/lib/use/ws';
+import { GraphQLSchema } from 'graphql';
+import { buildWsContext } from './context';
+import { depthLimitRule } from './limits';
+import { env } from '../config/env';
+import logger from '../utils/logger';
 
-import { PubSub } from 'apollo-server-express';
+export interface SubscriptionServer {
+  wsServer: WebSocketServer;
+  dispose: () => Promise<void>;
+  connections: () => number;
+}
 
-const pubsub = new PubSub();
-
-export const subscriptionResolvers = {
-  postCreated: {
-    subscribe: () => pubsub.asyncIterator(['POST_CREATED'])
-  },
-  postUpdated: {
-    subscribe: () => pubsub.asyncIterator(['POST_UPDATED'])
-  },
-  postDeleted: {
-    subscribe: () => pubsub.asyncIterator(['POST_DELETED'])
-  },
-  userFollowed: {
-    subscribe: () => pubsub.asyncIterator(['USER_FOLLOWED'])
-  },
-  userUnfollowed: {
-    subscribe: () => pubsub.asyncIterator(['USER_UNFOLLOWED'])
-  },
-  likeAdded: {
-    subscribe: () => pubsub.asyncIterator(['LIKE_ADDED'])
-  },
-  likeRemoved: {
-    subscribe: () => pubsub.asyncIterator(['LIKE_REMOVED'])
-  },
-  commentAdded: {
-    subscribe: () => pubsub.asyncIterator(['COMMENT_ADDED'])
-  }
-};
-
-export const publishPostCreated = (post: any) => {
-  pubsub.publish('POST_CREATED', { postCreated: post });
-};
-
-export const publishPostUpdated = (post: any) => {
-  pubsub.publish('POST_UPDATED', { postUpdated: post });
-};
-
-export const publishPostDeleted = (postId: string) => {
-  pubsub.publish('POST_DELETED', { postDeleted: { id: postId } });
-};
-
-export const publishUserFollowed = (followerId: string, followingId: string) => {
-  pubsub.publish('USER_FOLLOWED', { userFollowed: { followerId, followingId } });
-};
-
-export const publishUserUnfollowed = (followerId: string, followingId: string) => {
-  pubsub.publish('USER_UNFOLLOWED', { userUnfollowed: { followerId, followingId } });
-};
-
-export const publishLikeAdded = (userId: string, postId: string) => {
-  pubsub.publish('LIKE_ADDED', { likeAdded: { userId, postId } });
-};
-
-export const publishLikeRemoved = (userId: string, postId: string) => {
-  pubsub.publish('LIKE_REMOVED', { likeRemoved: { userId, postId } });
-};
-
-export const publishCommentAdded = (comment: any) => {
-  pubsub.publish('COMMENT_ADDED', { commentAdded: comment });
+export const startSubscriptionServer = (httpServer: HttpServer, schema: GraphQLSchema, path = '/graphql'): SubscriptionServer => {
+  const wsServer = new WebSocketServer({ server: httpServer, path });
+  const server = useServer(
+    {
+      schema,
+      context: (ctx) => buildWsContext(ctx.connectionParams as Record<string, unknown> | undefined),
+      onSubscribe: async (_ctx, msg) => {
+        // same depth guard as HTTP operations
+        const { parse, validate } = await import('graphql');
+        const document = typeof msg.payload.query === 'string' ? parse(msg.payload.query) : msg.payload.query;
+        const errors = validate(schema, document, [depthLimitRule(env.maxQueryDepth)]);
+        if (errors.length) return errors;
+        return undefined;
+      },
+      onError: (_ctx, _msg, errors) => {
+        logger.debug(`ws subscription error: ${errors.map((e) => e.message).join('; ')}`);
+      }
+    },
+    wsServer
+  );
+  logger.info(`GraphQL subscriptions ready at ${path} (graphql-ws)`);
+  return { wsServer, dispose: async () => server.dispose(), connections: () => wsServer.clients.size };
 };

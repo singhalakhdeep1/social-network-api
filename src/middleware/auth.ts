@@ -1,54 +1,56 @@
 /**
- * JWT AUTHENTICATION MIDDLEWARE
- * 
- * CURRICULUM COVERAGE:
- * #676-700: JWT Token Verification
+ * JWT authentication for every transport (GraphQL HTTP, GraphQL WebSocket, tRPC, gRPC).
  */
-
 import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
 import User from '../models/User';
+import { forbidden, unauthenticated } from '../utils/errors';
 
 export interface AuthUser {
   id: string;
-  email: string;
   username: string;
+  email: string;
+  role: 'user' | 'admin';
 }
 
-export const authMiddleware = async (token: string): Promise<AuthUser | null> => {
-  if (!token) {
-    return null;
-  }
+export interface AccessTokenPayload {
+  sub: string;
+  usr: string;
+}
 
+export const signAccessToken = (user: { id: string; username: string }): string =>
+  jwt.sign({ sub: user.id, usr: user.username } satisfies AccessTokenPayload, env.jwtSecret, { expiresIn: env.jwtExpire as jwt.SignOptions['expiresIn'] });
+
+export const extractBearer = (header?: string | null): string | undefined => {
+  if (!header) return undefined;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match ? match[1] : undefined;
+};
+
+/** Resolves a bearer token to the current user, or null when missing / invalid / user deleted. */
+export const authenticate = async (token?: string | null): Promise<AuthUser | null> => {
+  if (!token) return null;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'social-media-secret') as any;
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return null;
-    }
-
-    return {
-      id: user._id.toString(),
-      email: user.email,
-      username: user.username
-    };
-  } catch (error) {
+    const decoded = jwt.verify(token, env.jwtSecret) as AccessTokenPayload;
+    const user = await User.findById(decoded.sub).select('username email role');
+    if (!user) return null;
+    return { id: user.id, username: user.username, email: user.email, role: user.role };
+  } catch {
     return null;
   }
 };
 
-export const fieldLevelAuth = (user: AuthUser | null, resourceOwnerId: string, field: string): boolean => {
-  if (!user) return false;
-  
-  // Admin can access everything
-  if (user.email.includes('admin')) return true;
-  
-  // Users can access their own data
-  if (user.id === resourceOwnerId) return true;
-  
-  // Public fields
-  const publicFields = ['id', 'username', 'bio', 'avatar', 'createdAt'];
-  if (publicFields.includes(field)) return true;
-  
-  return false;
+export const requireUser = (user: AuthUser | null | undefined): AuthUser => {
+  if (!user) throw unauthenticated();
+  return user;
 };
+
+export const requireAdmin = (user: AuthUser | null | undefined): AuthUser => {
+  const u = requireUser(user);
+  if (u.role !== 'admin') throw forbidden('Admin access required');
+  return u;
+};
+
+/** Field-level rule: private fields are visible to the owner and admins only. */
+export const canSeePrivateFields = (viewer: AuthUser | null | undefined, ownerId: string): boolean =>
+  !!viewer && (viewer.id === ownerId || viewer.role === 'admin');

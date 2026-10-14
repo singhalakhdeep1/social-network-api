@@ -1,259 +1,89 @@
 /**
- * ELASTICSEARCH CONFIGURATION
- * 
- * Client setup for advanced search functionality
+ * Elasticsearch client and index definitions. Elasticsearch is optional: when ELASTICSEARCH_URL
+ * is empty or the cluster is unreachable, SearchService transparently uses MongoDB text search.
  */
-
 import { Client } from '@elastic/elasticsearch';
+import { env } from './env';
+import logger from '../utils/logger';
 
-const ELASTICSEARCH_URL = process.env.ELASTICSEARCH_URL || 'http://localhost:9200';
+export const POSTS_INDEX = 'sn-posts';
+export const USERS_INDEX = 'sn-users';
 
-const client = new Client({
-  node: ELASTICSEARCH_URL,
-  maxRetries: 3,
-  requestTimeout: 30000,
-  sniffOnStart: false
-});
+let client: Client | null = null;
+let available = false;
+let healthTimer: NodeJS.Timeout | undefined;
 
-/**
- * Test Elasticsearch connection
- */
-export const testConnection = async () => {
-  try {
-    await client.ping();
-    console.log('✅ Elasticsearch Connected');
-    return true;
-  } catch (error) {
-    console.error('❌ Elasticsearch Connection Failed:', error);
-    return false;
-  }
-};
-
-/**
- * Create index if it doesn't exist
- */
-export const createIndex = async (indexName: string, mapping: any) => {
-  try {
-    const exists = await client.indices.exists({ index: indexName });
-    
-    if (!exists) {
-      await client.indices.create({
-        index: indexName,
-        body: { mappings: mapping }
-      });
-      console.log(`✅ Created index: ${indexName}`);
-    } else {
-      console.log(`ℹ️ Index already exists: ${indexName}`);
-    }
-  } catch (error) {
-    console.error(`❌ Error creating index ${indexName}:`, error);
-  }
-};
-
-/**
- * Index mappings for posts
- */
-export const postIndexMapping = {
+const postMapping = {
   properties: {
-    content: { type: 'text', analyzer: 'standard' },
-    author: { type: 'keyword' },
+    content: { type: 'text' },
     hashtags: { type: 'keyword' },
-    mentions: { type: 'keyword' },
-    createdAt: { type: 'date' },
+    author: { type: 'keyword' },
+    authorUsername: { type: 'keyword' },
+    mediaTypes: { type: 'keyword' },
     likeCount: { type: 'integer' },
     commentCount: { type: 'integer' },
+    createdAt: { type: 'date' },
     isArchived: { type: 'boolean' }
   }
-};
+} as const;
 
-/**
- * Index mappings for users
- */
-export const userIndexMapping = {
+const userMapping = {
   properties: {
-    username: { type: 'text', analyzer: 'standard' },
-    bio: { type: 'text', analyzer: 'standard' },
-    email: { type: 'keyword' },
+    username: { type: 'search_as_you_type' },
+    displayName: { type: 'text' },
+    bio: { type: 'text' },
     followerCount: { type: 'integer' },
     createdAt: { type: 'date' }
   }
+} as const;
+
+export const esClient = (): Client | null => (available ? client : null);
+export const esEnabled = (): boolean => available;
+
+const ensureIndex = async (index: string, mappings: Record<string, unknown>): Promise<void> => {
+  const exists = await client!.indices.exists({ index });
+  if (!exists) await client!.indices.create({ index, mappings: mappings as never });
 };
 
-/**
- * Initialize all indices
- */
-export const initializeIndices = async () => {
-  await createIndex('posts', postIndexMapping);
-  await createIndex('users', userIndexMapping);
-};
-
-/**
- * Index a post document
- */
-export const indexPost = async (postId: string, post: any) => {
-  try {
-    await client.index({
-      index: 'posts',
-      id: postId,
-      body: {
-        content: post.content,
-        author: post.author.toString(),
-        hashtags: post.hashtags || [],
-        mentions: post.mentions || [],
-        createdAt: post.createdAt,
-        likeCount: post.likes?.length || 0,
-        commentCount: post.commentCount || 0,
-        isArchived: post.isArchived || false
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error indexing post:', error);
+export const initElasticsearch = async (): Promise<boolean> => {
+  if (!env.elasticsearchUrl) {
+    logger.info('Search: ELASTICSEARCH_URL not set, using MongoDB text search');
+    return false;
   }
-};
-
-/**
- * Index a user document
- */
-export const indexUser = async (userId: string, user: any) => {
-  try {
-    await client.index({
-      index: 'users',
-      id: userId,
-      body: {
-        username: user.username,
-        bio: user.bio || '',
-        email: user.email,
-        followerCount: user.followers?.length || 0,
-        createdAt: user.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error indexing user:', error);
-  }
-};
-
-/**
- * Search posts with filters
- */
-export const searchPosts = async (query: string, filters: any = {}) => {
-  try {
-    const searchBody: any = {
-      query: {
-        bool: {
-          must: [
-            {
-              multi_match: {
-                query,
-                fields: ['content', 'hashtags'],
-                fuzziness: 'AUTO'
-              }
-            }
-          ],
-          filter: [
-            { term: { isArchived: false } }
-          ]
-        }
-      }
-    };
-
-    if (filters.dateRange) {
-      searchBody.query.bool.filter.push({
-        range: {
-          createdAt: {
-            gte: filters.dateRange.start,
-            lte: filters.dateRange.end
-          }
-        }
-      });
+  client = new Client({
+    node: env.elasticsearchUrl,
+    auth: env.elasticsearchUsername ? { username: env.elasticsearchUsername, password: env.elasticsearchPassword } : undefined,
+    maxRetries: 2,
+    requestTimeout: 8000
+  });
+  const connect = async (): Promise<boolean> => {
+    try {
+      await client!.ping();
+      await ensureIndex(POSTS_INDEX, postMapping);
+      await ensureIndex(USERS_INDEX, userMapping);
+      return true;
+    } catch (err) {
+      logger.warn(`Elasticsearch unavailable (${(err as Error).message}); using MongoDB text search`);
+      return false;
     }
-
-    if (filters.hashtags && filters.hashtags.length > 0) {
-      searchBody.query.bool.filter.push({
-        terms: { hashtags: filters.hashtags }
-      });
+  };
+  available = await connect();
+  if (available) logger.info('Elasticsearch connected');
+  healthTimer = setInterval(async () => {
+    const was = available;
+    available = await client!.ping().then(() => true).catch(() => false);
+    if (available && !was) {
+      await connect();
+      logger.info('Elasticsearch reconnected');
     }
-
-    const response = await client.search({
-      index: 'posts',
-      body: searchBody,
-      size: filters.limit || 20
-    });
-
-    return response.hits.hits.map((hit: any) => ({
-      id: hit._id,
-      ...hit._source
-    }));
-  } catch (error) {
-    console.error('❌ Error searching posts:', error);
-    return [];
-  }
+  }, 30_000);
+  healthTimer.unref();
+  return available;
 };
 
-/**
- * Search users
- */
-export const searchUsers = async (query: string, limit: number = 20) => {
-  try {
-    const response = await client.search({
-      index: 'users',
-      body: {
-        query: {
-          multi_match: {
-            query,
-            fields: ['username', 'bio'],
-            fuzziness: 'AUTO'
-          }
-        }
-      },
-      size: limit
-    });
-
-    return response.hits.hits.map((hit: any) => ({
-      id: hit._id,
-      ...hit._source
-    }));
-  } catch (error) {
-    console.error('❌ Error searching users:', error);
-    return [];
-  }
+export const closeElasticsearch = async (): Promise<void> => {
+  if (healthTimer) clearInterval(healthTimer);
+  await client?.close();
+  client = null;
+  available = false;
 };
-
-/**
- * Get autocomplete suggestions
- */
-export const getAutocompleteSuggestions = async (query: string, limit: number = 10) => {
-  try {
-    const response = await client.search({
-      index: 'users',
-      body: {
-        query: {
-          prefix: {
-            username: {
-              value: query,
-              case_insensitive: true
-            }
-          }
-        },
-        size: limit
-      }
-    });
-
-    return response.hits.hits.map((hit: any) => hit._source.username);
-  } catch (error) {
-    console.error('❌ Error getting autocomplete suggestions:', error);
-    return [];
-  }
-};
-
-/**
- * Delete document from index
- */
-export const deleteFromIndex = async (indexName: string, id: string) => {
-  try {
-    await client.delete({ index: indexName, id });
-  } catch (error) {
-    console.error(`❌ Error deleting from index ${indexName}:`, error);
-  }
-};
-
-export default client;

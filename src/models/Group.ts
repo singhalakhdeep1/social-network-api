@@ -1,94 +1,52 @@
 /**
- * GROUP MODEL
- * 
- * For Social Features
+ * Community group. Private groups require approval (`pendingMembers`).
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 
 export interface IGroup extends Document {
   name: string;
   description: string;
   avatar?: string;
   coverImage?: string;
-  creator: mongoose.Types.ObjectId;
-  admins: mongoose.Types.ObjectId[];
-  members: mongoose.Types.ObjectId[];
-  moderators: mongoose.Types.ObjectId[];
+  creator: Types.ObjectId;
+  admins: Types.ObjectId[];
+  moderators: Types.ObjectId[];
+  members: Types.ObjectId[];
+  pendingMembers: Types.ObjectId[];
   isPrivate: boolean;
   category: string;
   tags: string[];
-  rules?: string[];
+  rules: string[];
   postCount: number;
   memberCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const groupSchema: Schema<IGroup> = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    maxlength: 100
+const groupSchema = new Schema<IGroup>(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 100 },
+    description: { type: String, required: true, maxlength: 500 },
+    avatar: String,
+    coverImage: String,
+    creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    admins: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    moderators: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    members: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    pendingMembers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    isPrivate: { type: Boolean, default: false },
+    category: { type: String, default: 'general', lowercase: true, trim: true },
+    tags: [{ type: String, lowercase: true, trim: true }],
+    rules: [String],
+    postCount: { type: Number, default: 0, min: 0 },
+    memberCount: { type: Number, default: 0, min: 0 }
   },
-  description: {
-    type: String,
-    required: true,
-    maxlength: 500
-  },
-  avatar: {
-    type: String
-  },
-  coverImage: {
-    type: String
-  },
-  creator: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  admins: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  members: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  moderators: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  isPrivate: {
-    type: Boolean,
-    default: false
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  tags: [{
-    type: String
-  }],
-  rules: [{
-    type: String
-  }],
-  postCount: {
-    type: Number,
-    default: 0
-  },
-  memberCount: {
-    type: Number,
-    default: 0
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
-groupSchema.index({ creator: 1 });
-groupSchema.index({ category: 1 });
-groupSchema.index({ isPrivate: 1 });
+groupSchema.index({ members: 1 });
+groupSchema.index({ category: 1, memberCount: -1 });
+groupSchema.index({ name: 'text', description: 'text', tags: 'text' });
 
-const Group: Model<IGroup> = mongoose.model<IGroup>('Group', groupSchema);
-
+const Group: Model<IGroup> = mongoose.models.Group || mongoose.model<IGroup>('Group', groupSchema);
 export default Group;

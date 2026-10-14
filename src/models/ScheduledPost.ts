@@ -1,70 +1,38 @@
 /**
- * SCHEDULED POST MODEL
- * 
- * For Content Management
+ * A post queued for later publication (published by the scheduler job).
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
+import { IMedia, mediaSchema } from './Post';
 
 export interface IScheduledPost extends Document {
-  author: mongoose.Types.ObjectId;
+  author: Types.ObjectId;
   content: string;
-  media?: { url: string; type: string }[];
-  hashtags: string[];
-  mentions: mongoose.Types.ObjectId[];
+  media: IMedia[];
   scheduledFor: Date;
   status: 'pending' | 'published' | 'failed';
   publishedAt?: Date;
+  post?: Types.ObjectId;
   errorMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const scheduledPostSchema: Schema<IScheduledPost> = new mongoose.Schema({
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+const scheduledPostSchema = new Schema<IScheduledPost>(
+  {
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    content: { type: String, default: '', maxlength: 5000 },
+    media: { type: [mediaSchema], default: [] },
+    scheduledFor: { type: Date, required: true },
+    status: { type: String, enum: ['pending', 'published', 'failed'], default: 'pending' },
+    publishedAt: Date,
+    post: { type: Schema.Types.ObjectId, ref: 'Post' },
+    errorMessage: String
   },
-  content: {
-    type: String,
-    required: true,
-    maxlength: 5000
-  },
-  media: [{
-    url: String,
-    type: String
-  }],
-  hashtags: [{
-    type: String,
-    lowercase: true
-  }],
-  mentions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  scheduledFor: {
-    type: Date,
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'published', 'failed'],
-    default: 'pending'
-  },
-  publishedAt: {
-    type: Date
-  },
-  errorMessage: {
-    type: String
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
-scheduledPostSchema.index({ author: 1, scheduledFor: -1 });
+scheduledPostSchema.index({ author: 1, scheduledFor: 1 });
 scheduledPostSchema.index({ status: 1, scheduledFor: 1 });
 
-const ScheduledPost: Model<IScheduledPost> = mongoose.model<IScheduledPost>('ScheduledPost', scheduledPostSchema);
-
+const ScheduledPost: Model<IScheduledPost> = mongoose.models.ScheduledPost || mongoose.model<IScheduledPost>('ScheduledPost', scheduledPostSchema);
 export default ScheduledPost;

@@ -1,11 +1,8 @@
 /**
- * POST MODEL
- * 
- * CURRICULUM COVERAGE:
- * #601-640: Mongoose Schema with References
+ * Post model. Likes/comments/reactions live in their own collections; the counters here are
+ * denormalised ($inc'd by the services) so feed ranking never needs to count.
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
 
 export interface IMedia {
   url: string;
@@ -13,98 +10,70 @@ export interface IMedia {
   thumbnail?: string;
 }
 
+export const mediaSchema = new Schema<IMedia>(
+  {
+    url: { type: String, required: true },
+    type: { type: String, enum: ['image', 'video'], required: true },
+    thumbnail: String
+  },
+  { _id: false }
+);
+
 export interface IPost extends Document {
   content: string;
-  author: mongoose.Types.ObjectId;
+  author: Types.ObjectId;
   media: IMedia[];
   hashtags: string[];
-  mentions: mongoose.Types.ObjectId[];
-  likes: mongoose.Types.ObjectId[];
-  comments: mongoose.Types.ObjectId[];
+  mentions: Types.ObjectId[];
+  likeCount: number;
+  commentCount: number;
   sharesCount: number;
+  reactionCount: number;
+  sharedFrom?: Types.ObjectId;
+  group?: Types.ObjectId;
+  page?: Types.ObjectId;
   isPinned: boolean;
   isArchived: boolean;
-  isModerated: boolean;
-  moderationStatus?: 'pending' | 'approved' | 'rejected';
+  moderationStatus: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
   updatedAt: Date;
 }
 
-const mediaSchema = new Schema<IMedia>({
-  url: { type: String, required: true },
-  type: { type: String, enum: ['image', 'video'], required: true },
-  thumbnail: String
-});
+const postSchema = new Schema<IPost>(
+  {
+    content: { type: String, trim: true, maxlength: 5000, default: '' },
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    media: { type: [mediaSchema], default: [] },
+    hashtags: [{ type: String, trim: true, lowercase: true }],
+    mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    likeCount: { type: Number, default: 0, min: 0 },
+    commentCount: { type: Number, default: 0, min: 0 },
+    sharesCount: { type: Number, default: 0, min: 0 },
+    reactionCount: { type: Number, default: 0, min: 0 },
+    sharedFrom: { type: Schema.Types.ObjectId, ref: 'Post' },
+    group: { type: Schema.Types.ObjectId, ref: 'Group' },
+    page: { type: Schema.Types.ObjectId, ref: 'Page' },
+    isPinned: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false },
+    moderationStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' }
+  },
+  { timestamps: true }
+);
 
-const postSchema: Schema<IPost> = new mongoose.Schema({
-  content: {
-    type: String,
-    required: [true, 'Content is required'],
-    trim: true,
-    maxlength: 5000
-  },
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  media: [mediaSchema],
-  hashtags: [{
-    type: String,
-    trim: true,
-    lowercase: true
-  }],
-  mentions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  likes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  comments: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Comment'
-  }],
-  sharesCount: {
-    type: Number,
-    default: 0
-  },
-  isPinned: {
-    type: Boolean,
-    default: false
-  },
-  isArchived: {
-    type: Boolean,
-    default: false
-  },
-  isModerated: {
-    type: Boolean,
-    default: false
-  },
-  moderationStatus: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected']
+postSchema.pre('validate', function (next) {
+  if (!this.content && (!this.media || this.media.length === 0) && !this.sharedFrom) {
+    return next(new Error('A post needs text, media, or a shared post'));
   }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  next();
 });
 
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });
-postSchema.index({ hashtags: 1 });
+postSchema.index({ hashtags: 1, createdAt: -1 });
 postSchema.index({ mentions: 1 });
+postSchema.index({ group: 1, createdAt: -1 });
+postSchema.index({ page: 1, createdAt: -1 });
+postSchema.index({ content: 'text', hashtags: 'text' }, { weights: { content: 5, hashtags: 10 } });
 
-postSchema.virtual('likeCount').get(function () {
-  return this.likes?.length || 0;
-});
-
-postSchema.virtual('commentCount').get(function () {
-  return this.comments?.length || 0;
-});
-
-const Post: Model<IPost> = mongoose.model<IPost>('Post', postSchema);
-
+const Post: Model<IPost> = mongoose.models.Post || mongoose.model<IPost>('Post', postSchema);
 export default Post;

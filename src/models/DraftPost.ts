@@ -1,49 +1,27 @@
 /**
- * DRAFT POST MODEL
- * 
- * For Content Management
+ * An unpublished draft.
  */
-
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema, Types } from 'mongoose';
+import { IMedia, mediaSchema } from './Post';
 
 export interface IDraftPost extends Document {
-  author: mongoose.Types.ObjectId;
+  author: Types.ObjectId;
   content: string;
-  media?: { url: string; type: string }[];
-  hashtags: string[];
-  mentions: mongoose.Types.ObjectId[];
+  media: IMedia[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-const draftPostSchema: Schema<IDraftPost> = new mongoose.Schema({
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+const draftPostSchema = new Schema<IDraftPost>(
+  {
+    author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    content: { type: String, default: '', maxlength: 5000 },
+    media: { type: [mediaSchema], default: [] }
   },
-  content: {
-    type: String,
-    required: true
-  },
-  media: [{
-    url: String,
-    type: String
-  }],
-  hashtags: [{
-    type: String,
-    lowercase: true
-  }],
-  mentions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }]
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
 draftPostSchema.index({ author: 1, updatedAt: -1 });
 
-const DraftPost: Model<IDraftPost> = mongoose.model<IDraftPost>('DraftPost', draftPostSchema);
-
+const DraftPost: Model<IDraftPost> = mongoose.models.DraftPost || mongoose.model<IDraftPost>('DraftPost', draftPostSchema);
 export default DraftPost;

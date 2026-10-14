@@ -1,14 +1,25 @@
-// gRPC service definition for social-network-api
+// gRPC API for the social network (HLD: gRPC services).
+//
+// Authentication: send `authorization: Bearer <access token>` as call metadata.
+// Mutations act as the authenticated user; ids of "who is acting" are never taken from messages.
+// Streaming RPCs (server-streaming) deliver real-time posts and notifications.
 
 syntax = "proto3";
 
 package socialnetwork;
 
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc Refresh(RefreshRequest) returns (AuthResponse);
+}
+
 service UserService {
   rpc GetUser(GetUserRequest) returns (User);
-  rpc CreateUser(CreateUserRequest) returns (User);
-  rpc UpdateUser(UpdateUserRequest) returns (User);
+  rpc GetUserByUsername(GetUserByUsernameRequest) returns (User);
+  rpc UpdateProfile(UpdateProfileRequest) returns (User);
   rpc ListUsers(ListUsersRequest) returns (UserList);
+  rpc SearchUsers(SearchUsersRequest) returns (UserList);
 }
 
 service PostService {
@@ -16,19 +27,22 @@ service PostService {
   rpc CreatePost(CreatePostRequest) returns (Post);
   rpc UpdatePost(UpdatePostRequest) returns (Post);
   rpc DeletePost(DeletePostRequest) returns (DeleteResponse);
-  rpc GetFeed(GetFeedRequest) returns (PostList);
+  rpc ListUserPosts(ListUserPostsRequest) returns (PostList);
+  rpc GetFeed(GetFeedRequest) returns (FeedResponse);
+  // Server-streaming: new posts from the accounts you follow, as they are published.
+  rpc StreamNewPosts(StreamRequest) returns (stream Post);
 }
 
 service FollowService {
-  rpc Follow(FollowRequest) returns (FollowResponse);
-  rpc Unfollow(FollowRequest) returns (FollowResponse);
+  rpc Follow(FollowRequest) returns (User);
+  rpc Unfollow(FollowRequest) returns (User);
   rpc GetFollowers(GetFollowersRequest) returns (UserList);
   rpc GetFollowing(GetFollowingRequest) returns (UserList);
 }
 
 service LikeService {
-  rpc Like(LikeRequest) returns (LikeResponse);
-  rpc Unlike(LikeRequest) returns (LikeResponse);
+  rpc Like(LikeRequest) returns (Post);
+  rpc Unlike(LikeRequest) returns (Post);
   rpc GetLikes(GetLikesRequest) returns (UserList);
 }
 
@@ -40,51 +54,113 @@ service CommentService {
 service GraphService {
   rpc GetShortestPath(PathRequest) returns (PathResponse);
   rpc GetMutualFriends(MutualFriendsRequest) returns (UserList);
-  rpc GetRecommendations(RecommendationRequest) returns (UserList);
+  rpc GetRecommendations(RecommendationRequest) returns (RecommendationList);
+}
+
+service NotificationService {
+  rpc GetUnreadCount(Empty) returns (CountResponse);
+  // Server-streaming: your notifications, live.
+  rpc StreamNotifications(StreamRequest) returns (stream Notification);
+}
+
+message Empty {}
+
+message StreamRequest {}
+
+message CountResponse {
+  int32 count = 1;
 }
 
 message User {
   string id = 1;
   string username = 2;
-  string email = 3;
-  string display_name = 4;
-  string bio = 5;
-  int64 created_at = 6;
-  int64 updated_at = 7;
+  string display_name = 3;
+  string bio = 4;
+  string avatar = 5;
+  bool is_verified = 6;
+  bool is_private = 7;
+  int32 follower_count = 8;
+  int32 following_count = 9;
+  int32 post_count = 10;
+  string created_at = 11;
+}
+
+message Media {
+  string url = 1;
+  string type = 2;
 }
 
 message Post {
   string id = 1;
   string author_id = 2;
   string content = 3;
-  repeated string images = 4;
-  int64 created_at = 5;
-  int64 updated_at = 6;
+  repeated Media media = 4;
+  repeated string hashtags = 5;
+  int32 like_count = 6;
+  int32 comment_count = 7;
+  int32 shares_count = 8;
+  int32 reaction_count = 9;
+  string created_at = 10;
+  string updated_at = 11;
 }
 
 message Comment {
   string id = 1;
   string post_id = 2;
   string author_id = 3;
-  string content = 4;
-  int64 created_at = 5;
+  string parent_id = 4;
+  string content = 5;
+  int32 like_count = 6;
+  int32 reply_count = 7;
+  string created_at = 8;
+}
+
+message Notification {
+  string id = 1;
+  string type = 2;
+  string message = 3;
+  bool read = 4;
+  string sender_id = 5;
+  string post_id = 6;
+  string created_at = 7;
+}
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  string display_name = 4;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+  string two_factor_code = 3;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message AuthResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
 }
 
 message GetUserRequest {
   string id = 1;
 }
 
-message CreateUserRequest {
+message GetUserByUsernameRequest {
   string username = 1;
-  string email = 2;
-  string display_name = 3;
-  string bio = 4;
 }
 
-message UpdateUserRequest {
-  string id = 1;
-  string display_name = 2;
-  string bio = 3;
+message UpdateProfileRequest {
+  string display_name = 1;
+  string bio = 2;
+  string website = 3;
+  string location = 4;
 }
 
 message ListUsersRequest {
@@ -92,9 +168,15 @@ message ListUsersRequest {
   int32 offset = 2;
 }
 
+message SearchUsersRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
 message UserList {
   repeated User users = 1;
   int32 total = 2;
+  string next_cursor = 3;
 }
 
 message GetPostRequest {
@@ -102,9 +184,8 @@ message GetPostRequest {
 }
 
 message CreatePostRequest {
-  string author_id = 1;
-  string content = 2;
-  repeated string images = 3;
+  string content = 1;
+  repeated string media_urls = 2;
 }
 
 message UpdatePostRequest {
@@ -120,75 +201,102 @@ message DeleteResponse {
   bool success = 1;
 }
 
+message ListUserPostsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
 message PostList {
   repeated Post posts = 1;
-  int32 total = 2;
+  string next_cursor = 2;
+  bool has_more = 3;
 }
 
 message GetFeedRequest {
-  string user_id = 1;
-  int32 limit = 2;
+  int32 limit = 1;
+  string cursor = 2;
+  bool refresh = 3;
+}
+
+message FeedItem {
+  Post post = 1;
+  double score = 2;
+  string reason = 3;
+}
+
+message FeedResponse {
+  repeated FeedItem items = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
 }
 
 message FollowRequest {
-  string follower_id = 1;
-  string following_id = 2;
-}
-
-message FollowResponse {
-  bool success = 1;
+  string user_id = 1;
 }
 
 message GetFollowersRequest {
   string user_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
 }
 
 message GetFollowingRequest {
   string user_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
 }
 
 message LikeRequest {
-  string user_id = 1;
-  string post_id = 2;
-}
-
-message LikeResponse {
-  bool success = 1;
+  string post_id = 1;
 }
 
 message GetLikesRequest {
   string post_id = 1;
+  int32 limit = 2;
 }
 
 message CreateCommentRequest {
   string post_id = 1;
-  string author_id = 2;
-  string content = 3;
+  string content = 2;
+  string parent_id = 3;
 }
 
 message GetCommentsRequest {
   string post_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
 }
 
 message CommentList {
   repeated Comment comments = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
 }
 
 message PathRequest {
-  string from_user_id = 1;
-  string to_user_id = 2;
+  string to_user_id = 1;
 }
 
 message PathResponse {
   repeated string user_ids = 1;
   int32 distance = 2;
+  bool found = 3;
 }
 
 message MutualFriendsRequest {
-  string user_id_1 = 1;
-  string user_id_2 = 2;
+  string user_id = 1;
 }
 
 message RecommendationRequest {
-  string user_id = 1;
+  int32 limit = 1;
+}
+
+message Recommendation {
+  User user = 1;
+  int32 mutual_count = 2;
+}
+
+message RecommendationList {
+  repeated Recommendation recommendations = 1;
 }

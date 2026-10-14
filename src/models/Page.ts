@@ -92,7 +92,6 @@ const pageSchema: Schema<IPage> = new mongoose.Schema({
   timestamps: true
 });
 
-pageSchema.index({ handle: 1 });
 pageSchema.index({ owner: 1 });
 pageSchema.index({ category: 1 });
 

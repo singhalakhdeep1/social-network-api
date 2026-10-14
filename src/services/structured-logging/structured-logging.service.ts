@@ -1,8 +1,11 @@
 /**
- * Structured Logging Service for Social Network API
- * Implements structured logging with correlation IDs and context
+ * Structured logging (HLD): JSON log entries carrying a correlation id, user and request
+ * context. Context is held in AsyncLocalStorage so concurrent requests never see each
+ * other's correlation id.
  */
+import { AsyncLocalStorage } from 'async_hooks';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '../../utils/logger';
 
 export interface LogContext {
   correlationId: string;
@@ -18,65 +21,51 @@ export interface LogEntry {
   level: string;
   message: string;
   context: LogContext;
-  additionalContext?: Record<string, any>;
+  additionalContext?: Record<string, unknown>;
   error?: string;
 }
 
+const storage = new AsyncLocalStorage<LogContext>();
+
 export class StructuredLoggingService {
-  private currentContext: LogContext | null = null;
+  /** Runs `fn` with `context` visible to every log call made inside it (including async continuations). */
+  runWithContext<T>(context: LogContext, fn: () => T): T {
+    return storage.run(context, fn);
+  }
 
   setContext(context: LogContext): void {
-    this.currentContext = context;
+    storage.enterWith(context);
   }
 
-  getContext(): LogContext | null {
-    return this.currentContext;
+  getContext(): LogContext | undefined {
+    return storage.getStore();
   }
 
-  logInformation(message: string, additionalContext?: Record<string, any>): void {
-    const logEntry = this.createLogEntry('Information', message, additionalContext, null);
-    console.log(JSON.stringify(logEntry));
+  logInformation(message: string, additionalContext?: Record<string, unknown>): void {
+    logger.info(message, this.entry('Information', message, additionalContext));
   }
 
-  logWarning(message: string, additionalContext?: Record<string, any>): void {
-    const logEntry = this.createLogEntry('Warning', message, additionalContext, null);
-    console.warn(JSON.stringify(logEntry));
+  logWarning(message: string, additionalContext?: Record<string, unknown>): void {
+    logger.warn(message, this.entry('Warning', message, additionalContext));
   }
 
-  logError(message: string, error: string, additionalContext?: Record<string, any>): void {
-    const logEntry = this.createLogEntry('Error', message, additionalContext, error);
-    console.error(JSON.stringify(logEntry));
+  logError(message: string, error: string, additionalContext?: Record<string, unknown>): void {
+    logger.error(message, this.entry('Error', message, additionalContext, error));
   }
 
-  logAuditEvent(eventType: string, description: string, additionalContext?: Record<string, any>): void {
-    const context = { ...additionalContext };
-    context['auditEventType'] = eventType;
-    context['auditDescription'] = description;
-
-    const logEntry = this.createLogEntry('Audit', `AUDIT: ${description}`, context, null);
-    console.log(JSON.stringify(logEntry));
+  logAuditEvent(eventType: string, description: string, additionalContext?: Record<string, unknown>): void {
+    logger.info(`AUDIT: ${description}`, this.entry('Audit', `AUDIT: ${description}`, { ...additionalContext, auditEventType: eventType }));
   }
 
   static createCorrelationId(): string {
     return uuidv4();
   }
 
-  private createLogEntry(level: string, message: string, additionalContext?: Record<string, any>, error?: string): LogEntry {
-    const context = this.currentContext || this.defaultContext();
-
-    return {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      context,
-      additionalContext,
-      error
-    };
-  }
-
-  private defaultContext(): LogContext {
-    return {
-      correlationId: StructuredLoggingService.createCorrelationId()
-    };
+  /** Meta passed to winston. `severity` (not `level`) so it cannot clobber winston's own level. */
+  private entry(severity: string, _message: string, additionalContext?: Record<string, unknown>, error?: string): Record<string, unknown> {
+    const context = this.getContext() ?? { correlationId: StructuredLoggingService.createCorrelationId() };
+    return { severity, context, additionalContext, error };
   }
 }
+
+export const structuredLogger = new StructuredLoggingService();
