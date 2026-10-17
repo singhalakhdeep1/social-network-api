@@ -55,7 +55,7 @@ export const publishDraft = async (userId: string, id: string): Promise<Hydrated
   return post;
 };
 
-export const listDrafts = (userId: string): Promise<DraftDoc[]> => DraftPost.find({ author: userId }).sort({ updatedAt: -1 });
+export const listDrafts = (userId: string): Promise<DraftDoc[]> => DraftPost.find({ author: userId }).sort({ updatedAt: -1 }).exec();
 
 const parseFuture = (iso: string): Date => {
   const when = new Date(iso);
@@ -125,7 +125,7 @@ export const processDueScheduledPosts = async (): Promise<number> => {
 };
 
 export const listScheduled = (userId: string, includeProcessed = false): Promise<ScheduledDoc[]> =>
-  ScheduledPost.find({ author: userId, ...(includeProcessed ? {} : { status: 'pending' }) }).sort({ scheduledFor: 1 });
+  ScheduledPost.find({ author: userId, ...(includeProcessed ? {} : { status: 'pending' }) }).sort({ scheduledFor: 1 }).exec();
 
 export const contentCalendar = async (userId: string) => {
   const [posts, drafts] = await Promise.all([listScheduled(userId), listDrafts(userId)]);

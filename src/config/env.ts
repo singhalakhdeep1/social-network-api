@@ -53,6 +53,9 @@ export const env = {
 
   rateLimitBucketCapacity: num('RATE_LIMIT_BUCKET_CAPACITY', 100),
   rateLimitRefillRate: num('RATE_LIMIT_REFILL_RATE', 5),
+  /** Login / register / password-reset attempts per IP: burst size and sustained rate. */
+  authRateLimitCapacity: num('AUTH_RATE_LIMIT_CAPACITY', 10),
+  authRateLimitPerMinute: num('AUTH_RATE_LIMIT_PER_MINUTE', 10),
 
   elasticsearchUrl: str('ELASTICSEARCH_URL', ''),
   elasticsearchUsername: str('ELASTICSEARCH_USERNAME', ''),

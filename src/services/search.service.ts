@@ -190,7 +190,7 @@ export const recordSearch = async (userId: string, query: string): Promise<void>
   await SearchHistory.updateOne({ user: userId, query: q }, { $set: { searchedAt: new Date() } }, { upsert: true });
 };
 
-export const listHistory = (userId: string, limit = 20) => SearchHistory.find({ user: userId }).sort({ searchedAt: -1 }).limit(Math.min(limit, 100));
+export const listHistory = (userId: string, limit = 20) => SearchHistory.find({ user: userId }).sort({ searchedAt: -1 }).limit(Math.min(limit, 100)).exec();
 export const clearHistory = async (userId: string): Promise<boolean> => {
   await SearchHistory.deleteMany({ user: userId });
   return true;
@@ -214,4 +214,4 @@ export const deleteSavedSearch = async (userId: string, id: string): Promise<boo
   return true;
 };
 
-export const listSavedSearches = (userId: string) => SavedSearch.find({ user: userId }).sort({ createdAt: -1 });
+export const listSavedSearches = (userId: string) => SavedSearch.find({ user: userId }).sort({ createdAt: -1 }).exec();

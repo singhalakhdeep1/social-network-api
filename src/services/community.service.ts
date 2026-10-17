@@ -188,7 +188,7 @@ export const listGroups = async (viewerId: string | undefined, opts: { search?: 
   return paginate<GroupDoc, IGroup>(Group, filter, opts);
 };
 
-export const myGroups = (userId: string): Promise<GroupDoc[]> => Group.find({ members: userId }).sort({ updatedAt: -1 });
+export const myGroups = (userId: string): Promise<GroupDoc[]> => Group.find({ members: userId }).sort({ updatedAt: -1 }).exec();
 
 // =====================================================================================
 // Events
@@ -327,7 +327,7 @@ export const listEvents = (opts: { category?: string | null; search?: string | n
 export const myEvents = (userId: string): Promise<EventDoc[]> =>
   Event.find({ $or: [{ attendees: userId }, { waitlist: userId }, { host: userId }] })
     .sort({ startDate: 1 })
-    .limit(clampLimit(100, 100, 100));
+    .limit(clampLimit(100, 100, 100)).exec();
 
 // =====================================================================================
 // Pages
@@ -428,8 +428,8 @@ export const listPages = (opts: { search?: string | null; category?: string | nu
   return paginate<PageDoc, IPage>(Page, filter, opts);
 };
 
-export const myPages = (userId: string): Promise<PageDoc[]> => Page.find({ $or: [{ owner: userId }, { admins: userId }] }).sort({ createdAt: -1 });
-export const followedPages = (userId: string): Promise<PageDoc[]> => Page.find({ followers: userId }).sort({ followerCount: -1 });
+export const myPages = (userId: string): Promise<PageDoc[]> => Page.find({ $or: [{ owner: userId }, { admins: userId }] }).sort({ createdAt: -1 }).exec();
+export const followedPages = (userId: string): Promise<PageDoc[]> => Page.find({ followers: userId }).sort({ followerCount: -1 }).exec();
 
 // =====================================================================================
 // Polls
@@ -472,7 +472,7 @@ export const getPoll = async (viewerId: string | undefined, id: string): Promise
   return poll;
 };
 
-export const pollForPost = (postId: string): Promise<PollDoc | null> => Poll.findOne({ post: toObjectId(postId) });
+export const pollForPost = (postId: string): Promise<PollDoc | null> => Poll.findOne({ post: toObjectId(postId) }).exec();
 
 export const pollIsActive = (poll: IPoll): boolean => poll.isActive && (!poll.expiresAt || poll.expiresAt.getTime() > Date.now());
 

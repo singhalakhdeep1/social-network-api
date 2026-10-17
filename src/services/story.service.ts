@@ -55,9 +55,9 @@ export const getStory = async (viewerId: string | undefined, id: string): Promis
   return story;
 };
 
-export const myStories = (userId: string): Promise<StoryDoc[]> => Story.find({ author: userId, ...activeFilter() }).sort({ createdAt: -1 });
+export const myStories = (userId: string): Promise<StoryDoc[]> => Story.find({ author: userId, ...activeFilter() }).sort({ createdAt: -1 }).exec();
 
-export const archivedStories = (userId: string): Promise<StoryDoc[]> => Story.find({ author: userId, isArchived: true }).sort({ createdAt: -1 }).limit(100);
+export const archivedStories = (userId: string): Promise<StoryDoc[]> => Story.find({ author: userId, isArchived: true }).sort({ createdAt: -1 }).limit(100).exec();
 
 export const userStories = async (viewerId: string | undefined, userId: string): Promise<StoryDoc[]> => {
   if (!(await canViewUserContent(viewerId, userId))) return [];
@@ -121,7 +121,7 @@ export const replyToStory = async (userId: string, storyId: string, rawContent: 
   return reply;
 };
 
-export const storyReplies = (story: IStory & { _id: Types.ObjectId }) => StoryReply.find({ story: story._id }).sort({ createdAt: -1 }).limit(100);
+export const storyReplies = (story: IStory & { _id: Types.ObjectId }) => StoryReply.find({ story: story._id }).sort({ createdAt: -1 }).limit(100).exec();
 
 export const deleteStory = async (userId: string, id: string): Promise<boolean> => {
   const story = await Story.findById(toObjectId(id));

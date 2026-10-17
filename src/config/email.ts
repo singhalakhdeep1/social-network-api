@@ -44,7 +44,11 @@ export const testEmailConnection = async (): Promise<boolean> => {
 export const sendEmail = async (message: MailMessage): Promise<boolean> => {
   try {
     const info = await transporter.sendMail({ from: env.emailFrom, ...message });
-    if (!live) logger.info(`Email (log mode) to ${message.to}: ${message.subject}`);
+    if (!live) {
+      // Without SMTP the links (verification, password reset) are printed so local users can still finish those flows.
+      const links = [...message.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+      logger.info(`Email (log mode) to ${message.to}: ${message.subject}${links.length && !env.isProd ? ` | links: ${links.join(' ')}` : ''}`);
+    }
     else logger.debug(`Email sent ${info.messageId}`);
     return true;
   } catch (error) {

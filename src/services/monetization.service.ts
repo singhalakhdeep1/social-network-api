@@ -51,8 +51,8 @@ export const sendTip = async (senderId: string, recipientId: string, amount: num
   return { tip: (await Tip.findById(tip._id)) as TipDoc, payment: summary(result) };
 };
 
-export const myTips = (userId: string): Promise<TipDoc[]> => Tip.find({ sender: userId }).sort({ createdAt: -1 }).limit(100);
-export const receivedTips = (userId: string): Promise<TipDoc[]> => Tip.find({ recipient: userId, paymentStatus: 'completed' }).sort({ createdAt: -1 }).limit(100);
+export const myTips = (userId: string): Promise<TipDoc[]> => Tip.find({ sender: userId }).sort({ createdAt: -1 }).limit(100).exec();
+export const receivedTips = (userId: string): Promise<TipDoc[]> => Tip.find({ recipient: userId, paymentStatus: 'completed' }).sort({ createdAt: -1 }).limit(100).exec();
 
 // ---------------------------------------------------------------- subscriptions
 
@@ -118,8 +118,8 @@ export const cancelSubscription = async (subscriberId: string, subscriptionId: s
   return true;
 };
 
-export const mySubscriptions = (userId: string): Promise<SubscriptionDoc[]> => Subscription.find({ subscriber: userId, isActive: true, endDate: { $gt: new Date() } }).sort({ endDate: 1 });
-export const subscribersOf = (creatorId: string): Promise<SubscriptionDoc[]> => Subscription.find({ creator: creatorId, isActive: true, endDate: { $gt: new Date() } }).sort({ createdAt: -1 });
+export const mySubscriptions = (userId: string): Promise<SubscriptionDoc[]> => Subscription.find({ subscriber: userId, isActive: true, endDate: { $gt: new Date() } }).sort({ endDate: 1 }).exec();
+export const subscribersOf = (creatorId: string): Promise<SubscriptionDoc[]> => Subscription.find({ creator: creatorId, isActive: true, endDate: { $gt: new Date() } }).sort({ createdAt: -1 }).exec();
 
 /** Daily job: renew (demo) or lapse (stripe, which has no stored payment method) expired subscriptions. */
 export const processSubscriptionRenewals = async (): Promise<{ renewed: number; lapsed: number }> => {
@@ -241,7 +241,7 @@ const ownedAd = async (userId: string, id: string): Promise<AdDoc> => {
 };
 
 export const getAd = ownedAd;
-export const myAds = (userId: string): Promise<AdDoc[]> => Ad.find({ advertiser: userId }).sort({ createdAt: -1 });
+export const myAds = (userId: string): Promise<AdDoc[]> => Ad.find({ advertiser: userId }).sort({ createdAt: -1 }).exec();
 
 export const updateAd = async (userId: string, id: string, patch: { title?: string | null; description?: string | null; status?: string | null }): Promise<AdDoc> => {
   const ad = await ownedAd(userId, id);

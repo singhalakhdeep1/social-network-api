@@ -69,7 +69,7 @@ const publishConversationUpdate = async (c: ConversationDoc): Promise<void> => {
 export const listConversations = (userId: string, opts: { archived?: boolean | null; limit?: number | null } = {}): Promise<ConversationDoc[]> =>
   Conversation.find({ participants: userId, archivedBy: opts.archived ? userId : { $ne: userId } })
     .sort({ lastMessageAt: -1, _id: -1 })
-    .limit(clampLimit(opts.limit, 30, 100));
+    .limit(clampLimit(opts.limit, 30, 100)).exec();
 
 export const sendMessage = async (userId: string, conversationId: string, input: { content?: string | null; media?: IMedia[]; replyTo?: string | null }): Promise<MessageDoc> => {
   const conversation = await getConversation(userId, conversationId);

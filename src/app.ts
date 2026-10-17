@@ -1,5 +1,5 @@
 /**
- * HTTP application: GraphQL (Apollo Server 4) + WebSocket subscriptions, tRPC, Stripe webhook,
+ * HTTP application: GraphQL (Apollo Server 5) + WebSocket subscriptions, tRPC, Stripe webhook,
  * uploads, health and Prometheus metrics.
  */
 import express, { Express, NextFunction, Request, Response } from 'express';
@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit';
 import client from 'prom-client';
 import mongoose from 'mongoose';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';

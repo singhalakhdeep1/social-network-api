@@ -54,6 +54,8 @@ const PAGE_FIELDS = new Set(['nodes', 'items']);
 
 /** List fields multiply their children's cost by the page size they were asked for. */
 const listEstimator: ComplexityEstimator = ({ type, args, childComplexity, field }) => {
+  // Meta fields (__typename, which Apollo Client adds to every selection set) cost nothing to resolve.
+  if (field.name.startsWith('__')) return 0;
   const unwrapped = type instanceof GraphQLNonNull ? type.ofType : type;
   const isList = unwrapped instanceof GraphQLList;
   const limit = typeof args.limit === 'number' ? Math.min(Math.max(args.limit, 1), 100) : undefined;
@@ -76,7 +78,7 @@ export const complexityPlugin = (): ApolloServerPlugin<Context> => ({
             estimators: [fieldExtensionsEstimator(), listEstimator]
           });
           if (complexity > env.maxQueryComplexity) {
-            throw new AppError('BAD_USER_INPUT', `Query is too complex: ${complexity} exceeds the limit of ${env.maxQueryComplexity}`, { complexity });
+            throw new AppError('BAD_USER_INPUT', `Query is too complex: ${complexity} exceeds the limit of ${env.maxQueryComplexity}`, { complexity, http: { status: 400 } });
           }
         }
       }
@@ -97,16 +99,16 @@ export const rateLimitPlugin = (): ApolloServerPlugin<Context> => ({
         if (rootFields.every((f) => f.startsWith('__'))) return;
         void document;
 
-        // Credential endpoints: tight per-IP bucket (10 burst, 1 per 6 s) to blunt brute force.
+        // Credential endpoints: tight per-IP bucket (default 10 burst, 1 per 6 s) to blunt brute force.
         if (rootFields.some((f) => AUTH_FIELDS.has(f))) {
-          const res = await rateLimiter.consume(`auth:${contextValue.ip}`, 1, { capacity: 10, refillRate: 1 / 6 });
-          if (!res.allowed) throw new AppError('RATE_LIMITED', `Too many attempts. Retry in ${res.retryAfterSeconds}s`, { retryAfterSeconds: res.retryAfterSeconds });
+          const res = await rateLimiter.consume(`auth:${contextValue.ip}`, 1, { capacity: env.authRateLimitCapacity, refillRate: env.authRateLimitPerMinute / 60 });
+          if (!res.allowed) throw new AppError('RATE_LIMITED', `Too many attempts. Retry in ${res.retryAfterSeconds}s`, { retryAfterSeconds: res.retryAfterSeconds, http: { status: 429 } });
         }
 
         const cost = operation.operation === 'mutation' ? 5 : 1;
         const key = `gql:${contextValue.user?.id ?? contextValue.ip}`;
         const res = await rateLimiter.consume(key, cost);
-        if (!res.allowed) throw new AppError('RATE_LIMITED', `Rate limit exceeded. Retry in ${res.retryAfterSeconds}s`, { retryAfterSeconds: res.retryAfterSeconds });
+        if (!res.allowed) throw new AppError('RATE_LIMITED', `Rate limit exceeded. Retry in ${res.retryAfterSeconds}s`, { retryAfterSeconds: res.retryAfterSeconds, http: { status: 429 } });
       }
     };
   }

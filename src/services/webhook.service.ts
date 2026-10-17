@@ -60,7 +60,7 @@ export const deleteWebhook = async (userId: string, id: string): Promise<boolean
   return res.deletedCount === 1;
 };
 
-export const listWebhooks = (userId: string): Promise<HydratedDocument<IWebhook>[]> => Webhook.find({ user: userId }).sort({ createdAt: -1 });
+export const listWebhooks = (userId: string): Promise<HydratedDocument<IWebhook>[]> => Webhook.find({ user: userId }).sort({ createdAt: -1 }).exec();
 
 export const getWebhook = async (userId: string, id: string): Promise<HydratedDocument<IWebhook>> => {
   const hook = await Webhook.findOne({ _id: id, user: userId });

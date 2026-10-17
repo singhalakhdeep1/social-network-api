@@ -269,7 +269,7 @@ export const resolvers = {
         await postSvc.getVisiblePost(ctx.user?.id, postId);
         return pubsub.asyncIterator(TOPICS.REACTION_ADDED(postId));
       },
-      resolve: (p: { id: string }) => Reaction.findById(p.id)
+      resolve: (p: { id: string }) => Reaction.findById(p.id).exec()
     },
     feedUpdated: {
       subscribe: async (_: unknown, __: unknown, ctx: Context) => pubsub.asyncIterator(TOPICS.FEED_UPDATED(authed(ctx).id)),

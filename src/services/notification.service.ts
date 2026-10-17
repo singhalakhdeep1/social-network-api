@@ -66,7 +66,7 @@ export const listNotifications = (userId: string, opts: { unreadOnly?: boolean |
   return paginate(Notification, filter, opts);
 };
 
-export const unreadCount = (userId: string): Promise<number> => Notification.countDocuments({ recipient: userId, read: false });
+export const unreadCount = (userId: string): Promise<number> => Notification.countDocuments({ recipient: userId, read: false }).exec();
 
 export const markRead = async (userId: string, id: string): Promise<HydratedDocument<INotification>> => {
   const notification = await Notification.findById(id);

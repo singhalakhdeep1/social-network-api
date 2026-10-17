@@ -8,7 +8,7 @@ import { GraphPath, GraphPostNode, GraphProvider, GraphRecommendation, GraphUser
 
 const { traversal } = gremlin.process.AnonymousTraversalSource;
 const __ = gremlin.process.statics;
-const { P, order, t } = gremlin.process;
+const { P, order, column } = gremlin.process;
 
 type Traversal = ReturnType<ReturnType<typeof traversal>['withRemote']>;
 
@@ -156,7 +156,7 @@ export class JanusGraphProvider implements GraphProvider {
       .by('id')
       .unfold()
       .order()
-      .by(__.select(t.values), order.desc)
+      .by(__.select(column.values), order.desc)
       .limit(limit)
       .toList();
     return (grouped as unknown as Map<string, number>[]).map((entry) => {
