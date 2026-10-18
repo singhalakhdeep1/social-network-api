@@ -68,29 +68,39 @@ logging.logAuditEvent('PostCreated', 'User created a post', { userId, postId });
 ### HLD Topics (High-Level Design)
 
 #### 1. GraphQL API
-**Location:** `src/graphql/` (Already exists)
+**Location:** `src/graphql/` (schema modules in `src/graphql/modules/`, subscriptions in `src/graphql/subscriptions.ts`)
 
-**Description:** GraphQL API for flexible social network data querying.
+**Description:** GraphQL API (Apollo Server 5) for flexible social network data querying, with graphql-ws subscriptions for live posts, notifications, messages, typing indicators, stories and event RSVPs. Depth and complexity limits apply to HTTP and WebSocket operations (`src/graphql/limits.ts`).
 
 #### 2. Graph Database (Neo4j/JanusGraph)
-**Location:** `src/neo4j/`, `src/janusgraph/` (Already exists)
+**Location:** `src/neo4j/`, `src/janusgraph/` (clients), `src/services/graph/` (providers)
 
-**Description:** Graph database integration for social graph operations.
+**Description:** Graph database integration for social graph operations: follow edges, mutual connections, shortest path and recommendations. `GRAPH_PROVIDER` selects `neo4j`, `janusgraph` (Gremlin) or `mongo` (default, no graph database needed). Follows are written to MongoDB and mirrored to the graph database; `npm run graph:sync` backfills it.
 
 #### 3. gRPC Services
-**Location:** `src/grpc/` (Already exists)
+**Location:** `src/grpc/` (`service.proto`, `server.ts`)
 
-**Description:** gRPC-based microservice communication.
+**Description:** gRPC-based microservice communication: Auth, User, Post, Follow, Like, Comment, Graph and Notification services, including server-streamed new posts and notifications. Bearer tokens travel in `authorization` metadata.
 
 #### 4. tRPC API
-**Location:** `src/trpc/` (Already exists)
+**Location:** `src/trpc/router.ts` (mounted at `/trpc`)
 
-**Description:** tRPC for type-safe API communication.
+**Description:** tRPC for type-safe API communication, calling the same services as GraphQL and gRPC.
 
 #### 5. Data Loaders
-**Location:** `src/dataloaders/` (Already exists)
+**Location:** `src/dataloaders/`, `src/graphql/loaders.ts`
 
-**Description:** Data loaders for efficient batch loading and N+1 query prevention.
+**Description:** Data loaders for efficient batch loading and N+1 query prevention, created per request (and per WebSocket operation) in the GraphQL context.
+
+#### 6. Search (Elasticsearch)
+**Location:** `src/config/elasticsearch.ts`, `src/services/search.service.ts`
+
+**Description:** Post and user search with autocomplete. Uses Elasticsearch when `ELASTICSEARCH_URL` is set and MongoDB text indexes otherwise; `npm run search:reindex` rebuilds the indexes.
+
+#### 7. Event Bus
+**Location:** `src/events/pubsub.ts`
+
+**Description:** Redis pub/sub for subscriptions when Redis is available (so several API instances share events), in-process PubSub otherwise. Payloads carry ids only; subscription resolvers reload and re-authorize the entity on delivery.
 
 ## Architecture
 
@@ -118,31 +128,48 @@ logging.logAuditEvent('PostCreated', 'User created a post', { userId, postId });
 │  │   GraphQL    │  │   Graph DB   │  │   Data       │      │
 │  │    API       │  │ (Neo4j/Janus)│  │  Loaders     │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   MongoDB    │  │Elasticsearch │  │ Redis PubSub │      │
+│  │ (primary DB) │  │   (search)   │  │ (live events)│      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+Entry points: GraphQL over HTTP and WebSocket (`/graphql`), tRPC (`/trpc`), gRPC (port 50051) and REST (`/health`, `/ready`, `/metrics`, `/uploads`, `/webhooks/stripe`). All of them call the shared services in `src/services/`. The Next.js client in `frontend-test/` talks to GraphQL only.
 
 ## Configuration
 
 Environment variables:
 
 ```env
-# Redis
+# Redis (REDIS_URL takes precedence over host/port)
+REDIS_URL=redis://localhost:6379
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# Rate Limiting
+# Rate Limiting (general bucket, then the stricter auth bucket)
 RATE_LIMIT_BUCKET_CAPACITY=100
-RATE_LIMIT_REFILL_RATE=1
+RATE_LIMIT_REFILL_RATE=5
+AUTH_RATE_LIMIT_CAPACITY=10
+AUTH_RATE_LIMIT_PER_MINUTE=10
+
+# Graph provider: mongo | neo4j | janusgraph
+GRAPH_PROVIDER=mongo
 
 # Neo4j
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 
-# JanusGraph
+# JanusGraph (or JANUSGRAPH_URL=ws://localhost:8182/gremlin)
 JANUSGRAPH_HOST=localhost
 JANUSGRAPH_PORT=8182
+
+# Elasticsearch
+ELASTICSEARCH_URL=http://localhost:9200
 ```
+
+The full list is in `.env.example`; `docker-compose.yml` runs the API with MongoDB, Redis, Elasticsearch and Neo4j (JanusGraph via the `janusgraph` profile).
 
 ## Summary
 

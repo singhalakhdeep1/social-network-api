@@ -1,485 +1,244 @@
 # Social Network API
 
-A social media API built with GraphQL, Apollo Server, and MongoDB featuring real-time subscriptions, feed algorithms, and optimized data loading.
+A social network backend in TypeScript: a GraphQL API (Apollo Server 5) with WebSocket subscriptions, plus tRPC, gRPC and REST entry points over the same services. MongoDB is the primary store, Redis handles caching, rate-limit buckets and cross-instance subscriptions, Elasticsearch powers search, and the follow graph can live in MongoDB, Neo4j or JanusGraph. A Next.js 14 + Apollo Client frontend in `frontend-test/` exercises the whole API.
 
-## Overview
-
-A full-stack social media application with GraphQL API and Next.js frontend. The backend is built with Apollo Server, MongoDB, and Redis, featuring feed algorithms, real-time subscriptions, DataLoader for query optimization, and comprehensive analytics. The entire codebase has been converted to TypeScript for type safety and better developer experience.
+The design is described in [SOCIAL_NETWORK_API_HLD_LLD.md](SOCIAL_NETWORK_API_HLD_LLD.md) and [SOCIAL_NETWORK_API_IMPLEMENTATION.md](SOCIAL_NETWORK_API_IMPLEMENTATION.md).
 
 ## Features
 
-### Core Features
-- **Post Management**: Create, update, delete, pin, archive posts with media support
-- **User Profiles**: Avatars, bios, follower/following counts, profile pages
-- **Follow System**: Bidirectional follow relationships with notifications
-- **Smart Feed Algorithm**: Personalized feed combining recency and engagement scoring
-- **Nested Comments**: Threaded comment system with replies
-- **Emoji Reactions**: Multiple emoji reactions on posts and comments
-- **Hashtag Tracking**: Automatic hashtag extraction and trending hashtags
-- **User Mentions**: @username parsing with mention notifications
-- **Real-time Subscriptions**: Live updates for posts, likes, comments, reactions
-- **Notifications**: Comprehensive notification system with read/unread status
-- **Analytics Dashboard**: User engagement metrics and analytics
+**Accounts and profiles**
+- Register, login, refresh-token rotation, logout
+- Email verification, forgot/reset password, change password
+- TOTP two-factor authentication
+- Profiles with avatar upload, private accounts, verified badges (admins only)
+- Notification preferences
 
-### Technical Features
-- **TypeScript**: Full TypeScript conversion for type safety
-- **DataLoader**: N+1 query optimization with batch loading
-- **Redis Caching**: Performance optimization for feeds and posts
-- **GraphQL Multipart Upload**: Media upload handling
-- **Content Moderation**: Automated content filtering
-- **Input Validation**: Sanitization and validation using validator and xss
-- **Query Complexity Analysis**: Depth limiting for GraphQL queries
-- **Rate Limiting**: Per-IP rate limiting on API endpoints
-- **Cursor-based Pagination**: Efficient pagination for large datasets
-- **Prometheus Metrics**: HTTP request and operation metrics
-- **JWT Authentication**: Secure token-based authentication
-- **Field-level Authorization**: Granular permission checks
-- **Helmet.js**: Security headers for Express
-- **Winston Logging**: Structured logging with file and console transports
+**Social graph**
+- Follow and unfollow, followers and following lists
+- Suggested users, mutual connections, shortest connection path between two users
+- Provider is chosen by `GRAPH_PROVIDER`: `mongo` (default), `neo4j` or `janusgraph`. `npm run graph:sync` copies existing follows into the graph database.
 
-## Tech Stack
+**Content**
+- Posts with media, hashtags, @mentions and visibility rules
+- Pin, archive, share, edit, delete
+- Likes, emoji reactions, threaded comments with comment likes
+- Polls
+- Ranked home feed (recency + engagement), trending posts and hashtags
+- Drafts, scheduled posts (published by a cron job) and a content calendar
 
-### Backend
-- Node.js 18.x
-- TypeScript 5.3.x
-- GraphQL 16.8.x
-- Apollo Server 3.13.x
-- Express.js 4.18.x
-- MongoDB 6.0+
-- Mongoose 8.0.x
-- Redis 7.x
-- DataLoader 2.2.x
-- JWT 9.0.x
-- Winston 3.11.x
-- Prometheus 15.1.x
-- graphql-upload 16.0.x
-- graphql-depth-limit 1.1.0
-- validator 13.11.x
-- xss 1.0.14
+**Stories**
+- 24-hour stories with views, reactions and replies
+- Highlights; a background job expires stories
 
-### Frontend
-- Next.js 14.x
-- TypeScript 5.3.x
-- React 18.x
-- Apollo Client 3.8.x
-- graphql-ws 5.14.x
-- TailwindCSS 3.4.x
-- Lucide React 0.303.x
-- date-fns 3.0.x
+**Messaging**
+- One-to-one and group conversations; messages are encrypted at rest (AES-256-GCM)
+- Read receipts, message reactions, typing indicators, mute and archive
+- Group admin and membership management
+- Live delivery over GraphQL subscriptions
 
-## Project Structure
+**Communities**
+- Groups (public or approval-based) with group posts and admins
+- Events with RSVPs and live RSVP updates
+- Pages with followers and page posts
+
+**Search**
+- Full-text search over posts and users, plus autocomplete
+- Search history and saved searches
+- Uses Elasticsearch when `ELASTICSEARCH_URL` is set and MongoDB text indexes otherwise; `npm run search:reindex` rebuilds the index
+
+**Monetization and insights**
+- Tips, creator subscription tiers and a creator dashboard
+- Ads with targeting, impressions and clicks
+- Stripe PaymentIntents and signed webhooks; without `STRIPE_SECRET_KEY` payments run in demo mode
+- Per-user and per-post analytics, event tracking
+- Outgoing webhooks with delivery log, share-to-platform links
+
+**Notifications**
+- Stored notifications with read/unread state and an unread count
+- Live delivery over subscriptions, optional email delivery
+
+**Platform**
+- **DataLoader** batching on every relation (no N+1 queries)
+- **Redis cache-aside** for users, posts and feeds, with an in-memory fallback
+- **Token-bucket rate limiting** per user/IP in Redis, with a stricter bucket for login, register and password reset
+- **Query guards**: depth limit and complexity limit on HTTP and WebSocket operations
+- **Structured logging**: Winston JSON logs with request ids
+- **Prometheus metrics** at `/metrics`, plus `/health` and `/ready`
+- Helmet security headers, CORS allow-list, input sanitization (validator + xss)
+- Runs without Redis, Elasticsearch or a graph database; each falls back to MongoDB or in-process equivalents and reports its mode in the `health` query
+
+## Tech stack
+
+| Area | Choice |
+|---|---|
+| Runtime | Node.js 20, TypeScript 5 |
+| GraphQL | Apollo Server 5 on Express 4, graphql-ws subscriptions, graphql-upload-minimal |
+| Other APIs | tRPC 10 (`/trpc`), gRPC (`src/grpc/service.proto`, port 50051), REST health/metrics/webhooks |
+| Data | MongoDB (Mongoose 8), Redis (ioredis), Elasticsearch 8, Neo4j 5 / JanusGraph (Gremlin) |
+| Jobs | node-cron (scheduled posts, story expiry, ads, subscription renewals) |
+| Payments, email | Stripe, Nodemailer |
+| Frontend | Next.js 14 (App Router), React 18, Apollo Client 3, Tailwind CSS |
+
+## Project structure
 
 ```
 social-network-api/
-├── src/                      # TypeScript source files
-│   ├── config/
-│   │   └── redis.ts          # Redis configuration
-│   ├── dataloaders/
-│   │   └── index.ts          # DataLoader for N+1 optimization
+├── src/
+│   ├── server.ts              # boots HTTP, WebSocket and gRPC servers, cron jobs
+│   ├── app.ts                 # Express app: security, metrics, uploads, Stripe webhook, tRPC, GraphQL
+│   ├── config/                # env, MongoDB, Redis, Elasticsearch, email
 │   ├── graphql/
-│   │   ├── schema.ts         # GraphQL schema definition
-│   │   └── resolvers/
-│   │       └── index.ts      # All resolvers (queries, mutations, subscriptions)
-│   ├── middleware/
-│   │   ├── auth.ts           # JWT authentication
-│   │   └── validation.ts     # Input validation & sanitization
-│   ├── models/
-│   │   ├── User.ts           # User schema with auth methods
-│   │   ├── Post.ts           # Post schema with media, hashtags, mentions
-│   │   ├── Comment.ts        # Comment schema with nested replies
-│   │   ├── Notification.ts   # Notification schema
-│   │   ├── AnalyticsEvent.ts # Analytics tracking schema
-│   │   └── Reaction.ts       # Emoji reactions schema
-│   ├── utils/
-│   │   └── logger.ts         # Winston logger
-│   └── server.ts             # Entry point with Apollo Server
-├── frontend-test/            # Next.js TypeScript frontend
-│   ├── app/
-│   │   ├── layout.tsx        # Root layout with Apollo Provider
-│   │   └── page.tsx          # Main page with all features
-│   ├── lib/
-│   │   ├── apollo-client.ts  # Apollo Client setup
-│   │   └── graphql-queries.ts # GraphQL queries & mutations
-│   └── package.json
-├── tests/                    # Test files
-├── dist/                     # Compiled JavaScript (generated)
-├── .env.example              # Environment template
-├── .gitignore
-├── package.json              # Backend dependencies
-├── tsconfig.json             # TypeScript configuration
-└── README.md
+│   │   ├── schema.ts          # merges the modules below
+│   │   ├── modules/           # user, post, story, messaging, community, content, search,
+│   │   │                      # notification, insights, monetization, base
+│   │   ├── context.ts         # per-request auth + DataLoaders
+│   │   ├── limits.ts          # depth and complexity rules
+│   │   └── subscriptions.ts   # graphql-ws server
+│   ├── services/              # business logic shared by GraphQL, tRPC and gRPC
+│   │   ├── cache/             # Redis cache-aside
+│   │   ├── rate-limiting/     # token buckets
+│   │   ├── structured-logging/
+│   │   └── graph/             # mongo, neo4j and janusgraph providers
+│   ├── models/                # Mongoose models
+│   ├── trpc/router.ts
+│   ├── grpc/                  # service.proto + server
+│   ├── neo4j/, janusgraph/    # database clients
+│   ├── events/pubsub.ts       # Redis or in-process PubSub
+│   ├── jobs/                  # cron jobs
+│   └── scripts/               # graph sync, search reindex
+├── frontend-test/             # Next.js frontend (see below)
+├── scripts/copy-assets.js     # copies the .proto into dist/
+├── Dockerfile
+├── docker-compose.yml
+└── .github/workflows/ci.yml
 ```
 
----
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js 18.x or higher
-- MongoDB 6.0+ (local or Atlas)
-- Redis 7.x (for caching)
-- npm or yarn package manager
+- Node.js 20+
+- MongoDB 6+
+- Optional: Redis 7, Elasticsearch 8, Neo4j 5 or JanusGraph
 
-### Installation
+### Run locally
 
-1. Clone the repository:
-```bash
-git clone https://github.com/Alakhdeepsingh/social-network-api.git
-cd social-network-api
-```
-
-2. Install backend dependencies:
 ```bash
 npm install
-```
+cp .env.example .env        # defaults work for a local MongoDB
+npm run dev                 # http://localhost:4000/graphql, ws://localhost:4000/graphql, gRPC :50051
 
-3. Install frontend dependencies:
-```bash
 cd frontend-test
 npm install
-cd ..
+cp .env.example .env.local  # NEXT_PUBLIC_API_URL=http://localhost:4000
+npm run dev                 # http://localhost:3100
 ```
 
-4. Configure environment variables:
+With `EMAIL_HOST` unset, verification and password-reset emails are written to the API log (including the link) instead of being sent.
+
+### Run with Docker
+
 ```bash
-cp .env.example .env
+docker compose up --build
 ```
 
-Edit `.env` with your configuration:
-```env
-PORT=4000
-NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/social-network-api
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRE=7d
-MAX_QUERY_COMPLEXITY=1000
-MAX_FILE_SIZE=10485760
-RATE_LIMIT_PER_MINUTE=60
-```
+This starts the API (4000, gRPC 50051), the web app (3100), MongoDB, Redis, Elasticsearch and Neo4j. For JanusGraph instead of Neo4j:
 
-5. Build TypeScript (for production):
 ```bash
-npm run build
+GRAPH_PROVIDER=janusgraph docker compose --profile janusgraph up --build
 ```
 
-6. Start the development server:
-```bash
-npm run dev
-```
+### Scripts
 
-The GraphQL API will be available at `http://localhost:4000/graphql`
+| Command | What it does |
+|---|---|
+| `npm run dev` | API with reload (tsx watch) |
+| `npm run build` | compile to `dist/` |
+| `npm start` | run the compiled API |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run graph:sync` | copy follows from MongoDB into the configured graph database |
+| `npm run search:reindex` | rebuild the Elasticsearch indexes |
 
-7. Start the frontend (in a separate terminal):
-```bash
-cd frontend-test
-npm run dev
-```
+Frontend (`frontend-test/`): `npm run dev`, `build`, `start`, `typecheck`, `lint`.
 
-The frontend will be available at `http://localhost:3100`
+## API
 
----
+### GraphQL
 
-## 📡 GraphQL API
-
-### Queries
+Endpoint `POST /graphql`; subscriptions on the same path using the graphql-ws protocol. Send `Authorization: Bearer <accessToken>` over HTTP, and `{ "authToken": "<accessToken>" }` as the WebSocket `connection_init` payload. Multipart uploads need the `apollo-require-preflight: true` header.
 
 ```graphql
-# Get current user
-query Me {
-  me {
-    id
-    username
-    email
-    profile {
-      avatar
-      bio
-      followersCount
-      followingCount
-    }
+mutation {
+  register(username: "ada", email: "ada@example.com", password: "Password123!") {
+    accessToken
+    refreshToken
+    user { id username }
   }
 }
 
-# Get feed
-query Feed($limit: Int!, $cursor: String) {
-  feed(limit: $limit, cursor: $cursor) {
-    edges {
-      node {
-        id
-        content
-        author {
-          username
-          avatar
-        }
-        likesCount
-        commentsCount
-        createdAt
-      }
-      cursor
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
+query {
+  feed(limit: 10) {
+    items { score reason post { id content likeCount commentCount author { username } } }
+    nextCursor
+    hasMore
   }
 }
 
-# Get user profile
-query Profile($username: String!) {
-  profile(username: $username) {
-    id
-    username
-    bio
-    avatar
-    posts(limit: 10) {
-      id
-      content
-      likesCount
-    }
-    followersCount
-    followingCount
-  }
+subscription {
+  messageSent(conversationId: "<id>") { id content sender { username } }
 }
 ```
 
-### Mutations
+Operations by module:
 
-```graphql
-# Create post
-mutation CreatePost($content: String!, $media: Upload) {
-  createPost(content: $content, media: $media) {
-    id
-    content
-    author {
-      username
-    }
-    createdAt
-  }
-}
+| Module | Queries | Mutations | Subscriptions |
+|---|---|---|---|
+| user | me, user, userByUsername, suggestedUsers, mutualConnections, connectionPath | register, login, refreshToken, logout, verifyEmail, resendVerificationEmail, forgotPassword, resetPassword, changePassword, setupTwoFactor, enableTwoFactor, disableTwoFactor, updateProfile, uploadAvatar, updateNotificationPreferences, followUser, unfollowUser, setUserVerified | |
+| post | post, posts, userPosts, archivedPosts, groupPosts, pagePosts, postsByHashtag, trendingHashtags, trendingPosts, feed, comments, commentReplies, poll | createPost, updatePost, deletePost, likePost, unlikePost, sharePost, pinPost, unpinPost, archivePost, unarchivePost, addComment, deleteComment, likeComment, unlikeComment, addReaction, removeReaction, createPoll, votePoll, closePoll | postCreated, postLiked, commentAdded, reactionAdded, feedUpdated |
+| story | storyTray, myStories, archivedStories, userStories, story, userStoryHighlights | createStory, viewStory, addStoryReaction, addStoryReply, deleteStory, createStoryHighlight, deleteStoryHighlight, addToHighlight, removeFromHighlight | storyCreated, storyViewed, storyReactionAdded |
+| messaging | conversations, conversation, messages, searchMessages | createConversation, sendMessage, markConversationRead, deleteMessage, reactToMessage, setTypingIndicator, archiveConversation, muteConversation, unmuteConversation, updateGroupInfo, add/removeConversationMember, add/removeConversationAdmin, leaveConversation | messageSent, typingIndicator, conversationUpdated |
+| community | group, groups, myGroups, event, events, myEvents, page, pages, myPages, followedPages | create/update/deleteGroup, join/leaveGroup, approveGroupMember, add/removeGroupMember, add/removeGroupAdmin, create/update/deleteEvent, rsvpEvent, cancelEventRSVP, create/update/deletePage, follow/unfollowPage, add/removePageAdmin | eventRSVP |
+| content | myDraftPosts, myScheduledPosts, contentCalendar | create/update/delete/publishDraft, schedulePost, updateScheduledPost, deleteScheduledPost, publishScheduledPost | |
+| search | search, searchPosts, searchUsers, autocompleteSuggestions, searchHistory, savedSearches | createSavedSearch, deleteSavedSearch, clearSearchHistory | |
+| notification | notifications, unreadNotificationCount | markNotificationAsRead, markAllNotificationsAsRead | notificationAdded |
+| insights | myAnalytics, userAnalytics, postEngagement, myWebhooks, webhook, webhookEvents | trackEvent, create/update/deleteWebhook, shareToPlatform | |
+| monetization | paymentMode, subscriptionTiers, myTips, receivedTips, mySubscriptions, mySubscribers, myAds, ad, adsForYou, creatorDashboard | sendTip, create/update/cancelSubscription, create/update/pause/resume/deleteAd, recordAdImpression, recordAdClick | |
+| base | health, ping, serverTime | | |
 
-# Follow user
-mutation Follow($userId: ID!) {
-  follow(userId: $userId) {
-    id
-    following {
-      id
-      username
-    }
-  }
-}
+### tRPC
 
-# Like post
-mutation LikePost($postId: ID!) {
-  likePost(postId: $postId) {
-    id
-    likesCount
-    isLiked
-  }
-}
-```
+Mounted at `/trpc` with routers `auth`, `user`, `post`, `follow`, `like`, `comment`, `graph`, `notification` and `search`; the router type is exported from `src/trpc/router.ts` for typed clients.
 
-### Subscriptions
+### gRPC
 
-```graphql
-# Subscribe to new posts
-subscription NewPosts {
-  newPosts {
-    id
-    content
-    author {
-      username
-    }
-    createdAt
-  }
-}
+`src/grpc/service.proto` defines `AuthService`, `UserService`, `PostService` (including the server-streamed `StreamNewPosts`), `FollowService`, `LikeService`, `CommentService`, `GraphService` and `NotificationService` (with `StreamNotifications`). Authenticated calls pass `authorization: Bearer <token>` metadata. Set `GRPC_ENABLED=false` to turn the server off.
 
-# Subscribe to notifications
-subscription Notifications {
-  notifications {
-    id
-    type
-    message
-    createdAt
-  }
-}
-```
+### REST
 
----
+| Route | Purpose |
+|---|---|
+| `GET /health` | liveness |
+| `GET /ready` | readiness: 200 when MongoDB is connected, also reports Redis and search mode |
+| `GET /metrics` | Prometheus: `http_requests_total`, `graphql_operation_duration_seconds`, `graphql_ws_connections`, Node.js defaults |
+| `GET /uploads/*` | uploaded media |
+| `POST /webhooks/stripe` | Stripe payment events (signature checked) |
 
-## Security Features
+## Frontend
 
-### Authentication
-- **JWT Context**: Authentication token passed in GraphQL context)
-- **Token Validation**: JWT verification on every authenticated request
-- **User Resolution**: User object available in resolvers
+`frontend-test/` is a Next.js 14 App Router client using Apollo Client with an HTTP upload link and a graphql-ws link. Pages: home feed with composer, explore, post detail, profiles, hashtag pages, search, notifications, messages (live chat with typing indicators), stories, groups, events, pages, drafts and scheduling, creator dashboard (tips, subscriptions, ads), settings (profile, avatar, 2FA, notification preferences, password), admin, email verification and password reset. Tokens are kept in localStorage and refreshed shortly before expiry; signing in or out creates a fresh Apollo client so no cached data or socket carries over between users.
 
-### Authorization
-- **Field-Level Authorization**: Check permissions before returning sensitive fields
-- **Role-Based Access**: Admin-only fields and mutations
-- **Ownership Verification**: Users can only modify their own content
+## Configuration
 
-### Rate Limiting
-- **Query Complexity**: Limit query complexity to prevent abuse
-- **Rate Limiting**: Per-user rate limiting on mutations
-- **Depth Limiting**: Maximum query depth to prevent deep recursion
+Every variable is listed with its default in [.env.example](.env.example). In production `JWT_SECRET` and `JWT_REFRESH_SECRET` are required; also set `MESSAGE_ENCRYPTION_KEY`, `CORS_ORIGINS` and `PUBLIC_URL`.
 
----
+## Verification
 
-## Database Schema
-
-### User Model
-```javascript
-{
-  username: String (unique, required),
-  email: String (unique, required),
-  password: String (hashed, required),
-  profile: {
-    avatar: String,
-    bio: String,
-    website: String,
-    location: String
-  },
-  followers: [ObjectId (ref: User)],
-  following: [ObjectId (ref: User)],
-  isPrivate: Boolean (default: false),
-  isVerified: Boolean (default: false),
-  createdAt: Date
-}
-```
-
-### Post Model
-```javascript
-{
-  author: ObjectId (ref: User, required),
-  content: String,
-  media: [{
-    url: String,
-    type: String,
-    thumbnail: String
-  }],
-  hashtags: [String],
-  mentions: [ObjectId (ref: User)],
-  likes: [ObjectId (ref: User)],
-  commentsCount: Number (default: 0),
-  sharesCount: Number (default: 0),
-  isPinned: Boolean (default: false),
-  isArchived: Boolean (default: false),
-  createdAt: Date
-}
-```
-
-### Comment Model
-```javascript
-{
-  post: ObjectId (ref: Post, required),
-  author: ObjectId (ref: User, required),
-  content: String (required),
-  parent: ObjectId (ref: Comment),
-  replies: [ObjectId (ref: Comment)],
-  likes: [ObjectId (ref: User)],
-  createdAt: Date
-}
-```
-
----
-
-## Testing
-
-The project includes comprehensive test suites:
-
-- **Resolver Tests**: Query and mutation testing
-- **Schema Tests**: Schema validation and type checking
-- **Subscription Tests**: Real-time subscription testing
-- **DataLoader Tests**: Batch loading optimization verification
-- **Integration Tests**: End-to-end API testing
-
-Run tests with coverage:
-```bash
-npm test -- --coverage
-```
-
----
-
-## 📈 Monitoring & Metrics
-
-### Prometheus Metrics
-- **HTTP Requests**: Total requests with method, route, and status labels
-- **GraphQL Operations**: Query, mutation, and subscription counts
-- **Database Operations**: MongoDB query performance metrics
-- **Cache Performance**: Redis cache hit/miss rates
-- **Error Rates**: Error tracking by type
-
-### Winston Logger Configuration
-- **Console**: Colored output for development
-- **File**: Combined logs in `logs/combined.log`
-- **Error File**: Error-specific logs in `logs/error.log`
-- **GraphQL File**: GraphQL-specific logs in `logs/graphql.log`
-- **Log Levels**: error, warn, info, http, debug
-
-### Metrics Endpoint
-```bash
-curl http://localhost:4000/metrics
-```
-
----
-
-## Deployment
-
-### Environment Variables for Production
-
-```env
-NODE_ENV=production
-PORT=4000
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/social-network-api
-REDIS_URL=redis://your-redis-instance:6379
-JWT_SECRET=your-production-secret-key
-JWT_EXPIRE=7d
-MAX_QUERY_COMPLEXITY=1000
-MAX_FILE_SIZE=10485760
-RATE_LIMIT_PER_MINUTE=60
-ENABLE_METRICS=true
-```
-
-### Deployment Platforms
-
-- **Heroku**: Ready for Heroku deployment with MongoDB and Redis add-ons
-- **Railway**: Compatible with Railway platform
-- **AWS**: Can be deployed to EC2 with DocumentDB and ElastiCache
-- **DigitalOcean**: Compatible with App Platform with managed databases
-
----
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
+Checked locally against real MongoDB 6, Redis 5 (Windows build), Elasticsearch 8.17, Neo4j 5.26 and TinkerPop Gremlin Server 3.7 (standing in for JanusGraph): GraphQL queries, mutations, uploads and subscriptions, tRPC, gRPC (including streams), and running with and without Redis. The frontend was exercised in a browser with two signed-in users (posting, likes, comments, live notifications, live direct messages and typing, stories, avatar upload, 2FA setup, drafts, groups, events and RSVPs, tips and the creator dashboard, search, sign-out). Not exercised here: real Stripe charges (demo mode and signature handling only), a real SMTP server, and the Docker images (no Docker daemon on the development machine).
 
 ## License
 
-Proprietary - All rights reserved.
-
----
+Proprietary. All rights reserved.
 
 ## Author
 
-**Alakhdeep Singh**
-
-- GitHub: [@Alakhdeepsingh](https://github.com/Alakhdeepsingh)
-- LinkedIn: [Alakhdeep Singh](https://linkedin.com/in/alakhdeepsingh)
-
----
-
-## 🙏 Acknowledgments
-
-- Built following GraphQL best practices
-- DataLoader pattern for N+1 query optimization
-- Security patterns from OWASP guidelines
-- Inspired by industry-standard social platforms like Twitter and Instagram
+**Alakhdeep Singh** · GitHub [@Alakhdeepsingh](https://github.com/Alakhdeepsingh)

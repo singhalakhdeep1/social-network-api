@@ -52,13 +52,13 @@ This document describes the API integrations added to Social Network API.
 - Graph analytics
 
 ### 5. GraphQL Subscriptions
-- Real-time post events (created, updated, deleted)
-- Real-time follow events (followed, unfollowed)
-- Real-time like events (added, removed)
-- Real-time comment events (added)
-- PubSub for event publishing
-- Subscription resolvers
-- Event-driven architecture
+- graphql-ws protocol on `/graphql`, authenticated through the `connection_init` payload
+- Posts: `postCreated` (people you follow), `postLiked`, `commentAdded`, `reactionAdded`, `feedUpdated`
+- Notifications: `notificationAdded`
+- Messaging: `messageSent`, `typingIndicator`, `conversationUpdated`
+- Stories: `storyCreated`, `storyViewed`, `storyReactionAdded`
+- Events: `eventRSVP`
+- Redis PubSub (multi-instance) with an in-process fallback; membership and visibility are checked at subscribe and delivery time
 
 ## Files Created
 
@@ -66,7 +66,8 @@ This document describes the API integrations added to Social Network API.
 - `src/trpc/router.ts` - tRPC router with procedures
 
 ### gRPC
-- `src/grpc/service.proto` - Protocol Buffer service definitions
+- `src/grpc/service.proto` - Protocol Buffer service definitions (also AuthService and NotificationService)
+- `src/grpc/server.ts` - gRPC server implementation (port `GRPC_PORT`, default 50051)
 
 ### Neo4j
 - `src/neo4j/client.ts` - Neo4j graph database service
@@ -74,29 +75,19 @@ This document describes the API integrations added to Social Network API.
 ### JanusGraph
 - `src/janusgraph/client.ts` - JanusGraph graph database service
 
+### Graph providers
+- `src/services/graph/` - `mongo`, `neo4j` and `janusgraph` providers behind one interface, chosen by `GRAPH_PROVIDER`
+
 ### GraphQL Subscriptions
-- `src/graphql/subscriptions.ts` - GraphQL subscription resolvers
+- `src/graphql/subscriptions.ts` - graphql-ws server
+- Subscription resolvers live with their modules in `src/graphql/modules/`
 
-## Installation Required
+## Installation
 
-Add to `package.json`:
-```json
-{
-  "dependencies": {
-    "@trpc/server": "^10.38.0",
-    "zod": "^3.22.0",
-    "@grpc/grpc-js": "^1.9.0",
-    "@grpc/proto-loader": "^0.7.10",
-    "neo4j-driver": "^5.15.0",
-    "gremlin": "^3.7.0",
-    "apollo-server-express": "^3.12.0"
-  }
-}
-```
-
-Run:
+All packages (`@trpc/server`, `zod`, `@grpc/grpc-js`, `@grpc/proto-loader`, `neo4j-driver`, `gremlin`, `@apollo/server`, `graphql-ws`) are declared in `package.json`:
 ```bash
 npm install
+npm run dev
 ```
 
 ## Environment Variables
@@ -110,12 +101,17 @@ NEO4J_PASSWORD=password
 # JanusGraph
 JANUSGRAPH_URL=ws://localhost:8182/gremlin
 
-# GraphQL
-GRAPHQL_PORT=4000
+# Graph provider: mongo | neo4j | janusgraph
+GRAPH_PROVIDER=neo4j
+
+# HTTP (GraphQL, tRPC) and gRPC ports
+PORT=4000
+GRPC_PORT=50051
 ```
 
+`NEO4J_USER` is also accepted. See `.env.example` for every variable.
+
 ## Notes
-- All code is written but packages are not installed (per user request)
 - tRPC provides end-to-end type safety
 - gRPC provides high-performance RPC
 - Neo4j uses Cypher for graph queries

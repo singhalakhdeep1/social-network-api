@@ -33,3 +33,10 @@ coverage/
 # Build
 dist/
 build/
+
+# Next.js frontend
+.next/
+*.tsbuildinfo
+
+# Uploaded media (local storage)
+uploads/

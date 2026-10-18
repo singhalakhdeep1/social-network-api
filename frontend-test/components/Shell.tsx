@@ -47,7 +47,9 @@ export default function Shell({ children }: { children: ReactNode }) {
       if (!event.data) return;
       setToast(event.data.notificationAdded.message);
       setTimeout(() => setToast(null), 5000);
-      void client.refetchQueries({ include: ['Me', 'Notifications'] });
+      // the Notifications query only exists while its page is mounted
+      const active = [...client.getObservableQueries().values()].map((q) => q.queryName);
+      void client.refetchQueries({ include: active.includes('Notifications') ? ['Me', 'Notifications'] : ['Me'] });
     },
   });
 

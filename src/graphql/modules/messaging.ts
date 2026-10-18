@@ -144,13 +144,14 @@ export const resolvers = {
       resolve: (p: { id: string }, _: unknown, ctx: Context) => ctx.loaders.message.load(p.id)
     },
     typingIndicator: {
-      subscribe: withFilter(
-        (async (_: unknown, { conversationId }: { conversationId: string }, ctx: Context) => {
-          await messages.getConversation(authed(ctx).id, conversationId);
-          return pubsub.asyncIterator(TOPICS.TYPING(conversationId));
-        }) as never,
-        (payload: { userId: string }, _args: unknown, ctx: Context) => payload.userId !== ctx.user?.id
-      ),
+      // withFilter needs a synchronous iterator factory, so the membership check runs first
+      subscribe: async (root: unknown, args: { conversationId: string }, ctx: Context, info: unknown) => {
+        await messages.getConversation(authed(ctx).id, args.conversationId);
+        return withFilter(
+          () => pubsub.asyncIterator(TOPICS.TYPING(args.conversationId)),
+          (payload: { userId: string }) => payload.userId !== ctx.user?.id
+        )(root, args, ctx, info as never);
+      },
       resolve: (p: { userId: string; conversationId: string; isTyping: boolean }) => p
     },
     conversationUpdated: {
